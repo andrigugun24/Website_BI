@@ -1,0 +1,875 @@
+================================================================================
+              DOKUMENTASI SISTEM TATARUMA BUSINESS INTELLIGENCE (BI)
+              Aplikasi Dashboard Analitik Penjualan Berbasis Web
+================================================================================
+Versi       : 1.0
+Tanggal     : 27 Maret 2026
+Teknologi   : Laravel 11 (Backend) + React 18 (Frontend)
+Tujuan      : Skripsi — Bimbingan Dosen
+
+================================================================================
+DAFTAR ISI
+================================================================================
+1.  Gambaran Umum Sistem
+2.  Arsitektur Teknologi
+3.  Struktur Database (ERD Deskriptif)
+4.  Sistem Autentikasi & Otorisasi
+5.  Fitur-Fitur Utama Sistem
+6.  Backend — Controller & Service Layer
+7.  Frontend — Halaman & Komponen React
+8.  API Endpoint (RESTful)
+9.  Alur Proses Bisnis (Business Flow)
+10. Keamanan Sistem
+11. Cara Instalasi & Menjalankan
+12. Akun Demo & Testing
+13. Fitur Krusial yang Belum Diterapkan & Akan Diterapkan
+
+================================================================================
+1. GAMBARAN UMUM SISTEM
+================================================================================
+
+Tataruma BI adalah aplikasi web dashboard Business Intelligence yang dirancang
+untuk membantu perusahaan (PT Tataruma) dalam menganalisis performa penjualan
+produk secara real-time. Sistem ini menyediakan visualisasi data berupa grafik,
+tabel, dan KPI (Key Performance Indicator) yang memudahkan pengambilan keputusan
+bisnis oleh manajemen.
+
+Ruang Lingkup Sistem:
+- Monitoring penjualan harian, mingguan, dan bulanan
+- Deteksi otomatis produk underperforming (performa menurun)
+- Analisis tren penjualan dengan perhitungan rasio tren
+- Manajemen produk (CRUD lengkap)
+- Manajemen transaksi penjualan
+- Pelaporan dengan export CSV dan PDF
+- Manajemen pengguna berbasis role (Admin, Manager, Owner)
+- ETL pipeline untuk pemrosesan data
+- Sistem notifikasi internal
+- Audit log aktivitas pengguna
+
+================================================================================
+2. ARSITEKTUR TEKNOLOGI
+================================================================================
+
+Layer           | Teknologi                  | Versi   | Fungsi
+----------------|----------------------------|---------|---------------------------
+Backend         | Laravel                    | 11.x    | REST API, Business Logic
+Frontend        | React                      | 18.x    | Single Page Application
+Build Tool      | Vite                       | 8.x     | Bundler & Dev Server
+Styling         | Tailwind CSS               | 3.x     | Utility-first CSS
+Auth            | Laravel Sanctum            | -       | Token-based API Auth
+Charts          | Recharts                   | -       | Visualisasi grafik
+Icons           | Lucide React               | -       | Icon set
+Alerts          | SweetAlert2                | -       | Dialog interaktif
+Database        | MySQL                      | 8.x     | Relational Database
+Web Server      | Apache (WAMP)              | -       | Local Development
+PDF Export      | DomPDF (barryvdh/laravel)  | -       | Generate laporan PDF
+Routing (FE)    | React Router (HashRouter)  | 6.x     | Client-side routing
+
+Pola Arsitektur:
+- Backend : MVC (Model-View-Controller) + Service Layer Pattern
+- Frontend: Component-Based Architecture (SPA)
+- Komunikasi: RESTful API dengan JSON
+- Autentikasi: Bearer Token (Sanctum Personal Access Token)
+
+================================================================================
+3. STRUKTUR DATABASE (ERD DESKRIPTIF)
+================================================================================
+
+Sistem memiliki 12 tabel utama:
+
+3.1 TABEL: roles
+-------------------------------------------------------------
+Kolom       | Tipe          | Keterangan
+------------|---------------|--------------------------------
+id          | BIGINT (PK)   | Primary key
+name        | VARCHAR       | Nama role (Admin, Manajer, Owner)
+slug        | VARCHAR       | Slug unik (admin, manager, owner)
+permissions | JSON          | Daftar hak akses dalam format array
+timestamps  | TIMESTAMP     | created_at, updated_at
+
+3.2 TABEL: users
+-------------------------------------------------------------
+Kolom             | Tipe          | Keterangan
+------------------|---------------|--------------------------------
+id                | BIGINT (PK)   | Primary key
+name              | VARCHAR       | Nama lengkap pengguna
+email             | VARCHAR (UQ)  | Email unik untuk login
+email_verified_at | TIMESTAMP     | Waktu verifikasi email
+password          | VARCHAR       | Kata sandi (hashed otomatis)
+role_id           | BIGINT (FK)   | Relasi ke tabel roles
+is_active         | BOOLEAN       | Status aktif/nonaktif akun
+remember_token    | VARCHAR       | Token "remember me"
+timestamps        | TIMESTAMP     | created_at, updated_at
+
+3.3 TABEL: products
+-------------------------------------------------------------
+Kolom          | Tipe          | Keterangan
+---------------|---------------|--------------------------------
+id             | BIGINT (PK)   | Primary key
+name           | VARCHAR       | Nama produk
+sku            | VARCHAR (UQ)  | Stock Keeping Unit (kode unik)
+category       | VARCHAR       | Kategori produk
+price          | DECIMAL(15,2) | Harga dasar produk
+current_stock  | INTEGER       | Jumlah stok saat ini
+min_stock      | INTEGER       | Batas minimum stok (alert)
+is_active      | BOOLEAN       | Status aktif produk
+deleted_at     | TIMESTAMP     | Soft delete timestamp
+timestamps     | TIMESTAMP     | created_at, updated_at
+
+3.4 TABEL: transactions
+-------------------------------------------------------------
+Kolom            | Tipe          | Keterangan
+-----------------|---------------|--------------------------------
+id               | BIGINT (PK)   | Primary key
+product_id       | BIGINT (FK)   | Relasi ke tabel products
+user_id          | BIGINT (FK)   | Pengguna yang mencatat
+transaction_date | DATE          | Tanggal transaksi
+quantity_sold    | INTEGER       | Jumlah terjual
+unit_price       | DECIMAL(15,2) | Harga satuan saat transaksi
+total_amount     | DECIMAL(15,2) | Total = qty × unit_price
+source           | VARCHAR       | Sumber data (manual/import/shopee)
+order_ref        | VARCHAR       | Referensi order eksternal
+timestamps       | TIMESTAMP     | created_at, updated_at
+
+3.5 TABEL: trend_analyses
+-------------------------------------------------------------
+Kolom               | Tipe          | Keterangan
+--------------------|---------------|--------------------------------
+id                  | BIGINT (PK)   | Primary key
+product_id          | BIGINT (FK)   | Relasi ke tabel products
+period_start        | DATE          | Awal periode analisis
+period_end          | DATE          | Akhir periode analisis
+base_period_start   | DATE          | Awal periode pembanding
+base_period_end     | DATE          | Akhir periode pembanding
+current_value       | DECIMAL(15,2) | Nilai penjualan periode saat ini
+base_value          | DECIMAL(15,2) | Nilai penjualan periode dasar
+trend_ratio         | DECIMAL(8,2)  | Rasio tren (%) = current/base×100
+is_underperforming  | BOOLEAN       | True jika rasio < 100%
+consecutive_decline | INTEGER       | Jumlah penurunan berturut-turut
+timestamps          | TIMESTAMP     | created_at, updated_at
+
+  Rumus Rasio Tren:
+  Trend Ratio (%) = (Nilai Periode Saat Ini / Nilai Periode Dasar) × 100
+  - Ratio > 100% = Produk bertumbuh (sehat)
+  - Ratio < 100% = Produk menurun (underperforming)
+  - Ratio < 50%  = Produk kritis
+
+3.6 TABEL: etl_logs
+-------------------------------------------------------------
+Kolom             | Tipe        | Keterangan
+------------------|-------------|--------------------------------
+id                | BIGINT (PK) | Primary key
+source            | VARCHAR     | Sumber ETL (manual/shopee/import)
+status            | VARCHAR     | Status (running/success/failed)
+records_processed | INTEGER     | Jumlah record diproses
+error_message     | TEXT        | Pesan error jika gagal
+started_at        | TIMESTAMP   | Waktu mulai proses
+completed_at      | TIMESTAMP   | Waktu selesai proses
+timestamps        | TIMESTAMP   | created_at, updated_at
+
+3.7 TABEL: settings
+-------------------------------------------------------------
+Kolom  | Tipe        | Keterangan
+-------|-------------|--------------------------------
+id     | BIGINT (PK) | Primary key
+key    | VARCHAR(UQ) | Kunci pengaturan (misal: company_name)
+value  | TEXT        | Nilai pengaturan
+timestamps          | created_at, updated_at
+
+3.8 TABEL: activity_logs
+-------------------------------------------------------------
+Kolom      | Tipe        | Keterangan
+-----------|-------------|--------------------------------
+id         | BIGINT (PK) | Primary key
+user_id    | BIGINT (FK) | Pengguna yang melakukan aksi
+action     | VARCHAR     | Jenis aksi (login/update/delete)
+target     | VARCHAR     | Objek yang ditargetkan
+details    | JSON        | Detail tambahan dalam format JSON
+ip_address | VARCHAR     | Alamat IP pengguna
+timestamps | TIMESTAMP   | created_at, updated_at
+
+3.9 TABEL: notifications
+-------------------------------------------------------------
+Kolom   | Tipe        | Keterangan
+--------|-------------|--------------------------------
+id      | BIGINT (PK) | Primary key
+title   | VARCHAR     | Judul notifikasi
+message | TEXT        | Isi pesan notifikasi
+type    | VARCHAR     | Tipe (info/warning/success)
+is_read | BOOLEAN     | Status sudah dibaca atau belum
+timestamps              | created_at, updated_at
+
+3.10 TABEL PENDUKUNG:
+- password_reset_tokens : Menyimpan token untuk reset kata sandi
+- personal_access_tokens: Token Sanctum untuk autentikasi API
+- sessions              : Data sesi pengguna aktif
+- cache, cache_locks    : Tabel cache Laravel
+- jobs, job_batches, failed_jobs : Queue system Laravel
+
+RELASI ANTAR TABEL:
+- users.role_id → roles.id (Many-to-One)
+- transactions.product_id → products.id (Many-to-One)
+- transactions.user_id → users.id (Many-to-One)
+- trend_analyses.product_id → products.id (Many-to-One)
+- activity_logs.user_id → users.id (Many-to-One)
+
+================================================================================
+4. SISTEM AUTENTIKASI & OTORISASI
+================================================================================
+
+4.1 Metode Autentikasi
+- Menggunakan Laravel Sanctum dengan Personal Access Token
+- Token dikirim melalui header HTTP: Authorization: Bearer {token}
+- Token disimpan di localStorage browser (key: 'token')
+- Setiap API call menyertakan token secara otomatis melalui Axios interceptor
+
+4.2 Alur Login
+1. User memasukkan email & password di halaman login
+2. Frontend mengirim POST /api/login
+3. Backend memvalidasi kredensial
+4. Jika valid, backend membuat token Sanctum & mengembalikannya
+5. Frontend menyimpan token + data user ke localStorage
+6. Selanjutnya semua request API menyertakan Bearer token
+
+4.3 Hak Akses Berdasarkan Role (RBAC)
+
+Role              | Hak Akses
+------------------|--------------------------------------------------
+Admin             | Akses penuh ke seluruh fitur sistem
+                  | CRUD produk, transaksi, pengguna
+                  | Manajemen data (ETL), export laporan
+                  | Pengaturan sistem, audit log
+                  |
+Manajer Marketing | Dashboard (lengkap dengan grafik)
+                  | Analisis tren (view only)
+                  | Lihat produk & transaksi (read-only)
+                  | Export laporan CSV & PDF
+                  |
+Owner             | Dashboard (hanya ringkasan KPI)
+                  | Ringkasan underperforming
+                  | Export PDF (hanya summary)
+
+4.4 Middleware Keamanan
+- RoleMiddleware: Mengecek role user sebelum mengizinkan akses endpoint
+- Mengecek status is_active: User nonaktif otomatis ditolak
+- Rate limiting (throttle): Membatasi jumlah request per waktu
+  → Login: max 5 request/menit
+  → Forgot Password: max 3 request/menit
+
+4.5 Fitur Reset Kata Sandi
+1. User klik "Lupa Kata Sandi" → muncul SweetAlert input email
+2. Frontend POST /api/forgot-password
+3. Backend membuat token acak 60 karakter & simpan di password_reset_tokens
+4. Backend membuat reset link (saat ini dicetak ke log server)
+5. User membuka link → halaman ResetPassword.jsx
+6. User masukkan password baru → POST /api/reset-password
+7. Backend validasi token & update password
+
+================================================================================
+5. FITUR-FITUR UTAMA SISTEM
+================================================================================
+
+5.1 DASHBOARD UTAMA
+- 4 KPI Cards: Total Produk Aktif, Revenue Bulan Ini, Total Penjualan, Transaksi
+- Perbandingan revenue bulan ini vs bulan lalu (persentase perubahan)
+- Bar chart: Penjualan harian 30 hari terakhir (Recharts)
+- Donut chart: Distribusi revenue per kategori produk
+- Ringkasan produk underperforming
+- Top 10 produk terlaris bulan ini
+- Owner hanya melihat KPI ringkasan (tanpa grafik detail)
+
+5.2 ANALISIS TREN PRODUK
+- Area chart komparatif untuk Top 10 produk
+- Tabel lengkap performa seluruh produk
+- Informasi: nama, SKU, kategori, rasio tren, status, rekomendasi
+- Filter berdasarkan produk dan periode
+- Kalkulasi tren bulanan (bulan ini vs bulan lalu)
+- Kalkulasi tren mingguan (minggu ini vs minggu lalu)
+- Kalkulasi tren kustom (periode bebas)
+
+5.3 KATALOG PRODUK
+- Tabel daftar produk: nama, SKU, kategori, harga, stok, status
+- Tambah produk baru (modal form)
+- Edit produk (modal form pre-filled)
+- Hapus/Nonaktifkan produk (soft delete dengan konfirmasi)
+- Search bar (pencarian berdasarkan nama/SKU)
+- Filter: kategori, status aktif, underperforming, stok rendah
+- Detail produk (modal popup)
+- Pagination
+
+5.4 TRANSAKSI PENJUALAN
+- Tabel riwayat transaksi dengan informasi lengkap
+- Form tambah transaksi baru (pilih produk, qty, harga, tanggal)
+- Filter berdasarkan tanggal dan produk
+- Summary KPI (total transaksi, revenue, qty, rata-rata)
+- Otomatis mengurangi stok produk saat transaksi masuk
+
+5.5 PELAPORAN (REPORTS)
+- Preview data transaksi dengan filter (tanggal, kategori)
+- Export CSV (Admin & Manager only)
+  → File CSV dengan encoding UTF-8 BOM untuk kompatibilitas Excel
+- Export PDF (semua role)
+  → Landscape A4, menggunakan DomPDF
+  → Owner hanya mendapat ringkasan (tanpa detail transaksi)
+- Summary cards: total transaksi, revenue, qty, rata-rata
+
+5.6 MANAJEMEN PENGGUNA (Admin Only)
+- Daftar semua user (nama, email, role, status)
+- Tambah pengguna baru
+- Edit role & informasi pengguna
+- Aktifkan/Nonaktifkan akun pengguna
+- Reset password pengguna
+
+5.7 MANAJEMEN DATA & ETL (Admin Only)
+- Trigger ETL pipeline secara manual
+- Riwayat log ETL (status, jumlah record, error)
+- Import data transaksi via API
+- Info cards: sumber data, jadwal ETL, status integrasi
+- ETL Pipeline Steps:
+  1. Extract: Ambil data dari sumber (manual/import/shopee)
+  2. Transform: Validasi & konversi format data
+  3. Load: Simpan ke tabel transactions
+  4. Recalculate: Hitung ulang trend ratio semua produk
+
+5.8 PENGATURAN SISTEM
+Menu pengaturan tersedia di sidebar sebagai dropdown dengan sub-menu:
+
+a) Profil Pengguna
+   - Lihat & edit nama lengkap
+   - Lihat email (readonly) dan role
+   - Ubah kata sandi (validasi password lama)
+
+b) Pengaturan Umum (Admin only)
+   - Nama perusahaan, mata uang default
+   - Format tanggal, timezone
+   - Disimpan di tabel settings (persisten di database)
+
+c) Notifikasi
+   - Toggle preferensi notifikasi
+   - Laporan email mingguan, alert stok minimum, dll.
+
+d) Keamanan
+   - Informasi sesi aktif
+   - Logout dari semua perangkat
+   - Riwayat login terakhir
+
+e) Audit Log (Admin only)
+   - Catatan seluruh aktivitas user dalam sistem
+   - Informasi: siapa, kapan, aksi apa, dari IP berapa
+   - Filter berdasarkan user dan tanggal
+
+5.9 SISTEM NOTIFIKASI
+- Ikon lonceng di header dengan badge merah (unread count)
+- Panel dropdown berisi daftar notifikasi
+- Tandai satu/semua notifikasi sebagai dibaca
+- Auto-polling setiap 60 detik
+- Link ke pengaturan preferensi notifikasi
+
+================================================================================
+6. BACKEND — CONTROLLER & SERVICE LAYER
+================================================================================
+
+6.1 CONTROLLERS (app/Http/Controllers/Api/)
+
+Controller              | Fungsi
+------------------------|-----------------------------------------------
+AuthController          | Login, logout, update profil, ubah password,
+                        | lupa & reset kata sandi, logout all devices
+DashboardController     | KPI cards, daily revenue chart, top products,
+                        | category distribution, underperforming summary
+AnalyticsController     | Trend analysis data, underperforming detection,
+                        | heatmap visualization, period comparison
+ProductController       | CRUD produk, filter, search, categories, detail
+TransactionController   | CRUD transaksi, summary, filter
+ReportController        | Preview, export CSV, export PDF, trend report
+DataManagementController| Run ETL, ETL logs, import data
+UserController          | CRUD user, roles list, aktivasi/deaktivasi
+
+Controller (app/Http/Controllers/)
+SettingController       | Get & update system settings
+ActivityLogController   | List & log audit activities
+NotificationController  | List, mark read, mark all read
+
+6.2 SERVICE LAYER (app/Services/)
+
+Service                | Fungsi
+-----------------------|-----------------------------------------------
+TrendRatioCalculator   | Menghitung rasio tren untuk semua produk aktif
+                       | Mendukung: monthly, weekly, custom period
+                       | Menghitung consecutive decline
+                       |
+                       | Rumus: Ratio = (Current/Base) × 100
+                       |
+UnderperformingDetector| Mendeteksi produk underperforming
+                       | Menentukan severity: critical/warning/watch
+                       | Memberikan rekomendasi otomatis
+                       | Dashboard summary statistics
+                       |
+                       | Kriteria Severity:
+                       | - critical: ratio<50% ATAU decline>=3 periode
+                       | - warning : ratio<80% ATAU decline>=2 periode
+                       | - watch   : ratio < 100%
+                       |
+EtlService             | Extract-Transform-Load pipeline
+                       | Sumber: manual, import CSV, Shopee API
+                       | Logging proses ETL ke tabel etl_logs
+                       | Import data CSV ke tabel transactions
+                       |
+ReportExportService    | Generate laporan CSV (UTF-8 BOM)
+                       | Generate laporan PDF (DomPDF, A4 Landscape)
+                       | Filter: tanggal, kategori, produk, sumber
+                       | Mode summary-only untuk role Owner
+
+6.3 MIDDLEWARE (app/Http/Middleware/)
+
+RoleMiddleware:
+- Mengecek apakah user memiliki role yang diizinkan
+- Mengecek status is_active user
+- Mengembalikan 401 jika tidak aktif
+- Mengembalikan 403 jika role tidak sesuai
+- Penggunaan: ->middleware('role:admin,manager')
+
+6.4 MODELS (app/Models/)
+
+Model          | Fitur Khusus
+---------------|----------------------------------------------
+User           | Cast password→hashed, relasi role, helper
+               | isAdmin(), isManager(), isOwner()
+Product        | Soft deletes, scope: active(), underperforming(),
+               | lowStock(), relasi transactions & trendAnalyses
+Transaction    | Scope: inPeriod(), byProduct(), bySource(),
+               | relasi product & user
+TrendAnalysis  | Scope: latestPerProduct(), underperforming(),
+               | relasi product, cast date fields
+Role           | Cast permissions→array, relasi users
+EtlLog         | Cast dates, relasi sumber data
+Setting        | Key-value store untuk konfigurasi sistem
+ActivityLog    | Relasi user, cast details→array
+Notification   | Status is_read, timestamps
+
+================================================================================
+7. FRONTEND — HALAMAN & KOMPONEN REACT
+================================================================================
+
+7.1 STRUKTUR FILE FRONTEND
+
+resources/js/
+├── App.jsx              → Root component, routing config
+├── main.jsx             → Entry point React
+├── services/
+│   └── api.js           → Axios instance & semua API methods
+├── components/
+│   └── Layout.jsx       → Layout utama (sidebar, header, nav)
+│                          Termasuk: NavItem, NavDropdown,
+│                          Notification popover, mobile bottom nav
+└── pages/
+    ├── Login.jsx         → Halaman login + demo accounts
+    ├── ResetPassword.jsx → Halaman reset kata sandi
+    ├── Dashboard.jsx     → Dashboard utama + KPI + charts
+    ├── TrendAnalysis.jsx → Analisis tren produk + grafik area
+    ├── Products.jsx      → CRUD produk + filter + search
+    ├── Transactions.jsx  → CRUD transaksi + filter
+    ├── Reports.jsx       → Preview + export CSV/PDF
+    ├── Users.jsx         → Manajemen pengguna (admin)
+    ├── DataManagement.jsx→ ETL + import data (admin)
+    └── Settings.jsx      → Pengaturan (5 sub-tab)
+
+7.2 KOMPONEN LAYOUT
+
+Sidebar Desktop (kiri, w-72):
+├── Logo & Nama Aplikasi
+├── Menu Navigasi:
+│   ├── Dashboard Utama
+│   ├── Analisis Tren
+│   ├── Produk
+│   ├── Transaksi
+│   ├── Pelaporan
+│   ├── Manajemen Pengguna (Admin only)
+│   ├── Manajemen Data (Admin only)
+│   └── Pengaturan (dropdown)
+│       ├── Profil Pengguna
+│       ├── Pengaturan Umum
+│       ├── Notifikasi
+│       ├── Keamanan
+│       └── Audit Log (Admin only)
+└── Tombol Log Out
+
+Header (top bar):
+├── Nama Role User
+├── Ikon Lonceng Notifikasi (dengan badge & dropdown panel)
+└── Info Profil (nama, role, avatar)
+
+Mobile Bottom Navigation:
+├── Utama, Tren, Produk, Laporan, Keluar
+
+7.3 HALAMAN LOGIN
+- Form email & password dengan validasi
+- Fitur "Intip Kata Sandi" (toggle ikon mata — Eye/EyeOff)
+- 3 tombol demo login cepat: Admin, Manager, Owner
+- Link "Lupa Kata Sandi?" → SweetAlert2 popup input email
+- Desain premium: gradient background, glassmorphism
+- Kutipan inspiratif tentang data
+
+7.4 API SERVICE (api.js)
+- Base URL otomatis dari meta tag
+- Axios interceptor: auto-inject Bearer token
+- Methods tersedia:
+  → Auth: login, forgotPassword, resetPassword, logout
+  → Profile: getMe, updateProfile, changePassword, logoutAll
+  → Dashboard: getDashboard
+  → Analytics: getTrend, getUnderperforming, calculateTrend
+  → Products: getProducts, getProduct, createProduct, updateProduct,
+              deleteProduct, getCategories
+  → Transactions: getTransactions, createTransaction, getTransactionSummary
+  → Reports: getReportPreview, exportCsv, exportPdf
+  → Data: importData, runEtl, getEtlLogs
+  → Users: getUsers, createUser, updateUser, deleteUser, getRoles
+  → Settings: getSettings, updateSettings, getActivityLogs
+  → Notifications: getNotifications, markNotificationRead,
+                    markAllNotificationsRead
+
+================================================================================
+8. API ENDPOINT (RESTful)
+================================================================================
+
+8.1 PUBLIC ENDPOINTS (tanpa autentikasi)
+METHOD | ENDPOINT            | FUNGSI                    | THROTTLE
+-------|---------------------|---------------------------|----------
+POST   | /api/login          | Login & dapatkan token    | 5/menit
+POST   | /api/forgot-password| Kirim link reset password | 3/menit
+POST   | /api/reset-password | Proses reset password     | 3/menit
+
+8.2 AUTHENTICATED ENDPOINTS (memerlukan Bearer token)
+
+Auth & Profile:
+POST   | /api/logout          | Logout & revoke token
+GET    | /api/me              | Data profil user saat ini
+PUT    | /api/me/profile      | Update nama profil
+PUT    | /api/me/password     | Ubah kata sandi
+POST   | /api/logout-all      | Logout dari semua perangkat
+
+Dashboard:
+GET    | /api/dashboard       | Data dashboard (semua role)
+
+Analytics (Admin & Manager):
+GET    | /api/analytics/trend           | Data analisis tren
+GET    | /api/analytics/underperforming | Produk underperforming
+POST   | /api/analytics/calculate       | Trigger kalkulasi tren (Admin)
+GET    | /api/analytics/heatmap         | Data heatmap penjualan
+GET    | /api/analytics/period-comparison| Perbandingan antar periode
+
+Produk:
+GET    | /api/products            | Daftar produk (Admin, Manager)
+GET    | /api/products/categories | Daftar kategori
+GET    | /api/products/{id}       | Detail produk
+POST   | /api/products            | Tambah produk (Admin)
+PUT    | /api/products/{id}       | Edit produk (Admin)
+DELETE | /api/products/{id}       | Hapus produk (Admin)
+
+Transaksi:
+GET    | /api/transactions         | Daftar transaksi
+GET    | /api/transactions/summary | Ringkasan transaksi
+POST   | /api/transactions         | Tambah transaksi (Admin)
+GET    | /api/transactions/{id}    | Detail transaksi
+
+Laporan:
+GET    | /api/reports/preview     | Preview data laporan
+GET    | /api/reports/export/csv  | Export CSV (Admin, Manager)
+GET    | /api/reports/export/pdf  | Export PDF (semua role)
+GET    | /api/reports/trend       | Laporan tren (Admin, Manager)
+
+Manajemen Data (Admin):
+POST   | /api/data-management/etl/run  | Jalankan ETL
+GET    | /api/data-management/etl/logs | Log riwayat ETL
+POST   | /api/data-management/import   | Import data
+
+Pengguna (Admin):
+GET    | /api/users          | Daftar pengguna
+POST   | /api/users          | Tambah pengguna
+GET    | /api/users/{id}     | Detail pengguna
+PUT    | /api/users/{id}     | Edit pengguna
+DELETE | /api/users/{id}     | Hapus pengguna
+GET    | /api/roles          | Daftar role
+
+Pengaturan & Log:
+GET    | /api/settings       | Ambil pengaturan sistem
+POST   | /api/settings       | Simpan pengaturan (Admin)
+GET    | /api/activity-logs  | Daftar audit log
+
+Notifikasi:
+GET    | /api/notifications               | Daftar notifikasi
+POST   | /api/notifications/{id}/read     | Tandai dibaca
+POST   | /api/notifications/read-all      | Tandai semua dibaca
+
+================================================================================
+9. ALUR PROSES BISNIS (BUSINESS FLOW)
+================================================================================
+
+9.1 ALUR LOGIN & AUTENTIKASI
+┌─────────┐  email/password  ┌─────────────┐  validasi   ┌──────────┐
+│  User   │ ───────────────→ │  POST /login│ ─────────→  │ Database │
+│ Browser │                  │  (Backend)  │ ←─────────  │  Users   │
+└─────────┘ ←── token+user   └─────────────┘  user data  └──────────┘
+     │
+     │ simpan token ke localStorage
+     ↓
+┌──────────────────────────┐
+│  Akses halaman dashboard │ → semua API call menyertakan token
+└──────────────────────────┘
+
+9.2 ALUR DETEKSI PRODUK UNDERPERFORMING
+┌──────────────┐    ┌─────────────────────┐    ┌──────────────────┐
+│ Transactions │ →  │ TrendRatioCalculator │ →  │  TrendAnalysis   │
+│   (Data)     │    │ (Hitung Ratio)      │    │  (Hasil Simpan)  │
+└──────────────┘    └─────────────────────┘    └──────────────────┘
+                                                       │
+                    ┌─────────────────────┐            │
+                    │UnderperformingDetect│ ←───────────┘
+                    │ (Severity+Rekomend.)│
+                    └─────────────────────┘
+                              │
+                    ┌─────────────────────┐
+                    │  Dashboard + Tren   │ ← Tampilkan ke user
+                    │  (Frontend)         │
+                    └─────────────────────┘
+
+9.3 ALUR ETL PIPELINE
+┌────────────┐   trigger   ┌────────────┐   ┌───────────┐
+│ Admin klik │ ──────────→ │ EtlService │ → │ Extract   │
+│ "Run ETL"  │             │   .run()   │   │ data      │
+└────────────┘             └────────────┘   └─────┬─────┘
+                                                  │
+                           ┌────────────┐   ┌─────▼─────┐
+                           │  Log ETL   │ ← │ Transform │
+                           │  (Status)  │   │ & Load    │
+                           └────────────┘   └─────┬─────┘
+                                                  │
+                           ┌────────────┐   ┌─────▼─────┐
+                           │ Dashboard  │ ← │ Recalculate│
+                           │  Updated   │   │ Trends    │
+                           └────────────┘   └───────────┘
+
+9.4 ALUR EXPORT LAPORAN
+┌────────────┐  filter   ┌──────────────────┐  generate  ┌──────────┐
+│ User pilih │ ────────→ │ ReportExportServ. │ ─────────→ │ File     │
+│ periode &  │           │ exportCsv() atau  │            │ CSV/PDF  │
+│ kategori   │           │ exportPdf()       │            │ download │
+└────────────┘           └──────────────────┘            └──────────┘
+
+================================================================================
+10. KEAMANAN SISTEM
+================================================================================
+
+10.1 Autentikasi
+- Password di-hash menggunakan Bcrypt (Laravel cast 'hashed')
+- Token API menggunakan Sanctum Personal Access Token
+- Token otomatis di-revoke saat logout
+
+10.2 Otorisasi
+- Role-Based Access Control (RBAC) dengan 3 level
+- Middleware 'role' mengecek slug role user
+- Pengecekan ganda: backend (middleware) + frontend (conditional render)
+
+10.3 Rate Limiting
+- Login endpoint: max 5 percobaan per menit
+- Forgot/Reset password: max 3 percobaan per menit
+- Mencegah brute-force attack
+
+10.4 Data Protection
+- Password reset token: random 60 karakter, disimpan di database
+- Soft delete untuk produk (data tidak hilang permanen)
+- Activity logging untuk audit trail
+
+10.5 Frontend Security
+- Token disimpan di localStorage (client-side)
+- PrivateRoute component: redirect ke login jika tidak ada token
+- Role-based rendering: menu admin tidak tampil untuk non-admin
+
+================================================================================
+11. CARA INSTALASI & MENJALANKAN
+================================================================================
+
+Prasyarat:
+- PHP >= 8.2
+- Composer
+- Node.js >= 18
+- MySQL >= 8.0
+- WAMP/XAMPP/Laragon
+
+Langkah Instalasi:
+1. Clone/copy project ke direktori web server (misal: c:\wamp64\www\ananda)
+2. cd ke direktori project
+3. composer install
+4. cp .env.example .env
+5. php artisan key:generate
+6. Buat database MySQL bernama 'ananda' (atau sesuai .env)
+7. Konfigurasi .env:
+   DB_DATABASE=ananda
+   DB_USERNAME=root
+   DB_PASSWORD=
+8. php artisan migrate --seed
+9. npm install
+10. npm run build
+11. Akses: http://localhost/ananda/public/
+
+Untuk development:
+- npm run dev (Vite dev server dengan hot reload)
+
+================================================================================
+12. AKUN DEMO & TESTING
+================================================================================
+
+Sistem menyediakan 3 akun demo bawaan (dari seeder):
+
+Role              | Email                 | Password      | Akses
+------------------|-----------------------|---------------|------------------
+Administrator     | admin@tataruma.com    | password123   | Akses penuh
+Manajer Marketing | manager@tataruma.com  | password123   | View + Export
+Owner             | owner@tataruma.com    | password123   | Summary only
+
+Untuk testing di halaman login, tersedia 3 tombol demo login cepat:
+- Klik "Admin" → otomatis isi kredensial admin
+- Klik "Manager" → otomatis isi kredensial manager
+- Klik "Owner" → otomatis isi kredensial owner
+
+================================================================================
+13. FITUR KRUSIAL YANG BELUM DITERAPKAN & AKAN DITERAPKAN
+================================================================================
+
+Berikut adalah daftar fitur yang belum diimplementasikan ke dalam sistem,
+disusun berdasarkan tingkat urgensi untuk mendukung kelayakan pakai sistem
+di lingkungan produksi (production-ready).
+
+------------------------------------------------------------------------
+13.1 PRIORITAS TINGGI (Wajib untuk Production)
+------------------------------------------------------------------------
+
+# | Fitur                         | Status Saat Ini       | Rencana Implementasi
+--|-------------------------------|------------------------|---------------------
+1 | Konfigurasi SMTP Email        | Reset password hanya   | Integrasi layanan
+  |                               | dicetak ke log server  | email (Mailtrap /
+  |                               | (Log::info)            | Gmail SMTP / SendGrid)
+  |                               |                        | agar link reset password
+  |                               |                        | benar-benar terkirim
+  |                               |                        | ke inbox email pengguna.
+  |                               |                        |
+2 | Axios 401 Interceptor         | Jika token expired,    | Tambahkan interceptor
+  | (Auto-redirect saat token     | user tetap di halaman  | di api.js sehingga
+  |  kadaluarsa)                  | kosong tanpa notif     | response 401 otomatis
+  |                               |                        | menghapus token dari
+  |                               |                        | localStorage dan
+  |                               |                        | redirect ke /login.
+  |                               |                        |
+3 | Upload File CSV/Excel         | Import data hanya      | Tambahkan komponen
+  | untuk Import Data             | menerima JSON via API  | upload file di halaman
+  |                               |                        | Manajemen Data, parser
+  |                               |                        | CSV (library PapaParse),
+  |                               |                        | preview tabel sebelum
+  |                               |                        | konfirmasi import.
+  |                               |                        |
+4 | Notifikasi Otomatis           | Tabel notifications    | Buat trigger otomatis
+  | (Auto-generate)               | ada tapi isinya kosong | yang membuat notifikasi
+  |                               | (belum ada yang        | saat: stok produk di
+  |                               |  men-generate)         | bawah minimum, produk
+  |                               |                        | terdeteksi underperform,
+  |                               |                        | ETL selesai/gagal,
+  |                               |                        | user baru ditambahkan.
+
+------------------------------------------------------------------------
+13.2 PRIORITAS SEDANG (Peningkatan Kualitas)
+------------------------------------------------------------------------
+
+# | Fitur                         | Status Saat Ini       | Rencana Implementasi
+--|-------------------------------|------------------------|---------------------
+5 | Pengaturan Umum Persisten     | Disimpan di            | Sudah ada tabel
+  | di Database                   | localStorage browser   | 'settings' di database.
+  |                               | (hilang jika ganti     | Perlu sinkronisasi
+  |                               |  browser/clear cache)   | agar frontend baca/tulis
+  |                               |                        | dari API, bukan hanya
+  |                               |                        | localStorage.
+  |                               |                        |
+6 | Heatmap Visualization         | Backend endpoint       | Buat komponen React
+  | (Peta Panas Penjualan)        | /analytics/heatmap     | yang menampilkan matrix
+  |                               | sudah ada, frontend    | produk × waktu dengan
+  |                               | belum ada              | warna gradasi hijau-merah
+  |                               |                        | berdasarkan volume
+  |                               |                        | penjualan.
+  |                               |                        |
+7 | Period Comparison UI          | Backend endpoint       | Buat UI dengan date
+  | (Perbandingan Periode)        | /analytics/period-     | picker untuk memilih
+  |                               | comparison sudah ada,  | 2 periode, lalu tampilkan
+  |                               | frontend belum ada     | column chart perbandingan
+  |                               |                        | per produk.
+  |                               |                        |
+8 | Konfirmasi Aksi Destruktif    | Hapus produk/user      | Integrasikan SweetAlert2
+  | (SweetAlert untuk Delete)     | langsung tanpa         | confirm dialog sebelum
+  |                               | konfirmasi             | setiap aksi delete/
+  |                               |                        | nonaktifkan.
+  |                               |                        |
+9 | Loading Skeleton              | Menggunakan teks       | Ganti dengan shimmer/
+  | (Shimmer Effect)              | "Memuat..." sederhana  | skeleton loader animasi
+  |                               |                        | untuk UX yang lebih
+  |                               |                        | premium.
+
+------------------------------------------------------------------------
+13.3 PRIORITAS RENDAH (Nice-to-Have / Pengembangan Lanjutan)
+------------------------------------------------------------------------
+
+# | Fitur                         | Status Saat Ini       | Rencana Implementasi
+--|-------------------------------|------------------------|---------------------
+10| Dark Mode (Tema Gelap)        | Hanya tema Light       | Tambahkan toggle tema
+  |                               |                        | di pengaturan, simpan
+  |                               |                        | preferensi di localStorage,
+  |                               |                        | terapkan class dark mode
+  |                               |                        | di Tailwind CSS.
+  |                               |                        |
+11| Scheduled ETL (Cron Job)      | ETL hanya bisa         | Konfigurasi Laravel
+  |                               | dipicu manual oleh     | Scheduler (app/Console/
+  |                               | admin via tombol       | Kernel.php) untuk
+  |                               |                        | menjalankan ETL otomatis
+  |                               |                        | setiap hari jam 00:00.
+  |                               |                        |
+12| Shopee API Integration        | Placeholder card       | Implementasi OAuth
+  |                               | "Belum Aktif" di       | Shopee, pull order data
+  |                               | Manajemen Data         | otomatis, mapping SKU
+  |                               |                        | ke produk internal.
+  |                               |                        |
+13| Multi-language (i18n)         | Semua teks hardcoded   | Gunakan library i18n
+  |                               | Bahasa Indonesia       | (react-i18next) untuk
+  |                               |                        | dukungan multi-bahasa.
+  |                               |                        |
+14| Email Verification            | Field email_verified_at| Kirim email verifikasi
+  |                               | ada di tabel users     | saat registrasi, cek
+  |                               | tapi tidak digunakan   | status verified sebelum
+  |                               |                        | izinkan login.
+  |                               |                        |
+15| PWA / Offline Support         | Murni web app biasa    | Tambahkan service worker
+  |                               |                        | dan manifest.json agar
+  |                               |                        | bisa di-install ke
+  |                               |                        | smartphone.
+
+------------------------------------------------------------------------
+CATATAN PENGEMBANGAN:
+------------------------------------------------------------------------
+- Fitur #1-4 (Prioritas Tinggi) sangat disarankan untuk diterapkan
+  sebelum sistem digunakan oleh pengguna nyata (production deployment).
+- Fitur #5-9 (Prioritas Sedang) akan meningkatkan kualitas dan
+  pengalaman pengguna secara signifikan.
+- Fitur #10-15 (Prioritas Rendah) bersifat opsional dan dapat
+  dijadikan bahan pengembangan di masa depan (future work).
+- Backend API untuk beberapa fitur yang belum ada di frontend
+  (heatmap, period comparison) sudah siap dan terverifikasi,
+  sehingga implementasi frontend-nya relatif cepat.
+------------------------------------------------------------------------
+
+================================================================================
+                           AKHIR DOKUMENTASI
+================================================================================
+Catatan untuk Bimbingan:
+- Sistem ini menggunakan arsitektur SPA (Single Page Application)
+- Backend berfungsi murni sebagai REST API (tidak merender HTML)
+- Frontend berkomunikasi dengan backend melalui HTTP request ke /api/*
+- Autentikasi menggunakan token (bukan session tradisional)
+- Semua business logic berada di Service Layer (bukan di Controller)
+- Design pattern: Repository → Service → Controller → Response
+================================================================================
