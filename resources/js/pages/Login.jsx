@@ -86,11 +86,8 @@ export default function Login() {
             <div className="absolute bottom-[-20%] left-[-10%] w-[50%] h-[80%] bg-[#f4e8dc] opacity-30 blur-[120px] pointer-events-none"></div>
 
             {/* Top Left Logo Area */}
-            <div className="absolute top-8 left-8 flex items-center gap-3 z-10">
-                <div className="w-10 h-10 bg-[#456254] text-white flex items-center justify-center font-bold text-lg rounded shadow-sm">
-                    TT
-                </div>
-                <h1 className="text-xl font-bold text-[#456254] tracking-tight">Tataruma BI</h1>
+            <div className="absolute top-8 left-8 flex items-center z-10">
+                <img src="/logo.png" alt="Tataruma" className="h-8 object-contain" />
             </div>
 
             {/* Login Card */}

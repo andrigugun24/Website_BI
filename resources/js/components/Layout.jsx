@@ -142,13 +142,7 @@ export default function Layout({ children }) {
             {/* Sidebar Desktop */}
             <aside className="fixed left-0 top-0 h-screen w-72 bg-surface flex-col p-6 gap-y-2 hidden md:flex z-50 shadow-sm border-r border-accent/10">
                 <div className="flex items-center gap-3 mb-8 px-2">
-                    <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center text-white shadow-sm">
-                        <LayoutDashboard size={20} className="text-cream" />
-                    </div>
-                    <div>
-                        <h2 className="font-extrabold text-primary leading-tight font-headline text-lg">Tataruma</h2>
-                        <p className="text-xs font-medium text-secondary">Intelligence Suite</p>
-                    </div>
+                    <img src="/logo.png" alt="Tataruma Logo" className="h-10 object-contain" />
                 </div>
 
                 <nav className="flex-1 flex flex-col gap-1 overflow-y-auto pr-1 pb-4">
