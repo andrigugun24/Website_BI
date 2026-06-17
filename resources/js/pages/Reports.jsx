@@ -42,8 +42,8 @@ export default function Reports() {
             if (filters.category) params.append('category', filters.category);
 
             const url = type === 'csv'
-                ? `/reports/export/csv?${params.toString()}`
-                : `/reports/export/pdf?${params.toString()}`;
+                ? `/api/reports/export/csv?${params.toString()}`
+                : `/api/reports/export/pdf?${params.toString()}`;
 
             const token = localStorage.getItem('token');
             const appUrl = window.appUrl || '';
@@ -161,7 +161,7 @@ export default function Reports() {
                     <div className="bg-white p-5 rounded-xl shadow-sm border border-accent/10">
                         <p className="text-[10px] font-bold text-accent uppercase tracking-wider mb-1">Total Pendapatan</p>
                         <h3 className="text-2xl font-black text-primary font-headline">
-                            Rp {(Number(preview.summary.total_revenue) / 1000000).toFixed(1)}M
+                            Rp {Number(preview.summary.total_revenue).toLocaleString('id-ID')}
                         </h3>
                     </div>
                     <div className="bg-white p-5 rounded-xl shadow-sm border border-accent/10">

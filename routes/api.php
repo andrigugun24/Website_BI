@@ -68,12 +68,12 @@ Route::middleware('auth:sanctum')->group(function () {
             ->middleware('role:admin,manager');
     });
 
-    // Products — Admin full CRUD, Manager read-only
+    // Products — Admin full CRUD, Manager & Owner read-only
     Route::get('/products', [ProductController::class, 'index'])
-        ->middleware('role:admin,manager');
+        ->middleware('role:admin,manager,owner');
 
     Route::get('/products/categories', [ProductController::class, 'categories'])
-        ->middleware('role:admin,manager');
+        ->middleware('role:admin,manager,owner');
 
     Route::get('/products/template/download', [ProductController::class, 'downloadTemplate'])
         ->middleware('role:admin,manager');
@@ -82,7 +82,7 @@ Route::middleware('auth:sanctum')->group(function () {
         ->middleware('role:admin');
 
     Route::get('/products/{product}', [ProductController::class, 'show'])
-        ->middleware('role:admin,manager');
+        ->middleware('role:admin,manager,owner');
 
     Route::post('/products', [ProductController::class, 'store'])
         ->middleware('role:admin');

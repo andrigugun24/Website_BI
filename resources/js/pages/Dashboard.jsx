@@ -114,7 +114,7 @@ export default function Dashboard() {
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-accent/10 hover:shadow-md transition-shadow">
                     <p className="text-xs font-bold text-accent uppercase tracking-wider mb-2">Total Pendapatan</p>
                     <h3 className="text-3xl font-black text-primary font-headline">
-                        Rp {(Number(data.kpi.total_revenue_month) / 1000000).toFixed(1)}M
+                        Rp {Number(data.kpi.total_revenue_month).toLocaleString('id-ID')}
                     </h3>
                     <div className="mt-4 flex items-center gap-2 text-sm font-medium">
                         <span className={`px-2 py-0.5 rounded flex items-center gap-1 ${data.kpi.revenue_change_pct >= 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
@@ -253,7 +253,7 @@ export default function Dashboard() {
                                             ))}
                                         </Pie>
                                         <RechartsTooltip 
-                                            formatter={(value) => [`Rp ${(Number(value)/1000000).toFixed(1)}M`, 'Revenue']}
+                                            formatter={(value) => [`Rp ${Number(value).toLocaleString('id-ID')}`, 'Pendapatan']}
                                         />
                                     </PieChart>
                                 </ResponsiveContainer>
@@ -266,7 +266,7 @@ export default function Dashboard() {
                                             <div className="w-3 h-3 rounded-sm" style={{backgroundColor: COLORS[i % COLORS.length]}}></div>
                                             <span className="font-bold text-on-surface truncate max-w-[100px]">{cat.category}</span>
                                         </div>
-                                        <span className="text-on-surface/80">Rp {(Number(cat.revenue)/1000000).toFixed(1)}M</span>
+                                        <span className="text-on-surface/80">Rp {Number(cat.revenue).toLocaleString('id-ID')}</span>
                                     </div>
                                 ))}
                             </div>
