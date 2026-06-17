@@ -87,7 +87,7 @@ export default function Login() {
 
             {/* Top Left Logo Area */}
             <div className="absolute top-8 left-8 flex items-center z-10">
-                <img src="/logo.png" alt="Tataruma" className="h-8 object-contain" />
+                <span className="font-sans font-extrabold text-[#708F7F] text-[28px] tracking-tighter lowercase drop-shadow-sm">tataruma</span>
             </div>
 
             {/* Login Card */}

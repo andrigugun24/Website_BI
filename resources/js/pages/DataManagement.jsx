@@ -179,16 +179,6 @@ export default function DataManagement() {
                     <h3 className="text-xl font-black text-primary">02:00 WIB</h3>
                     <p className="text-xs text-accent mt-1">Setiap hari otomatis</p>
                 </div>
-                <div className="bg-white p-5 rounded-xl shadow-sm border border-accent/10">
-                    <div className="flex items-center gap-3 mb-3">
-                        <div className="w-10 h-10 rounded-lg bg-surface flex items-center justify-center">
-                            <AlertTriangle size={20} className="text-orange-500" />
-                        </div>
-                        <p className="text-[10px] font-bold text-accent uppercase tracking-wider">Shopee API</p>
-                    </div>
-                    <h3 className="text-xl font-black text-accent">Belum Aktif</h3>
-                    <p className="text-xs text-accent mt-1">Menunggu konfigurasi</p>
-                </div>
             </div>
 
             {/* ETL Logs Table */}

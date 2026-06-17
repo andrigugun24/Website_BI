@@ -64,7 +64,7 @@ class AuthController extends Controller
     }
 
     /**
-     * Fake Forgot Password (logs to file)
+     * Forgot Password — send reset link via email (with log fallback).
      */
     public function forgotPassword(Request $request): JsonResponse
     {
@@ -81,17 +81,28 @@ class AuthController extends Controller
 
         $resetLink = url('/#/reset-password?token=' . $token . '&email=' . urlencode($request->email));
         
-        // Simulating email send
-        Log::info("========================================");
-        Log::info("PASSWORD RESET REQUEST");
-        Log::info("To: " . $request->email);
-        Log::info("Link: " . $resetLink);
-        Log::info("========================================");
+        $user = User::where('email', $request->email)->first();
+        $userName = $user ? $user->name : 'Pengguna';
+
+        // Attempt to send email, fallback to log if SMTP is not configured
+        try {
+            \Illuminate\Support\Facades\Mail::to($request->email)
+                ->send(new \App\Mail\ResetPasswordMail($resetLink, $userName));
+            Log::info("Password reset email sent to: {$request->email}");
+        } catch (\Exception $e) {
+            // Fallback: log the reset link if email sending fails
+            Log::warning("Email sending failed, logging reset link instead: " . $e->getMessage());
+            Log::info("========================================");
+            Log::info("PASSWORD RESET REQUEST (FALLBACK)");
+            Log::info("To: " . $request->email);
+            Log::info("Link: " . $resetLink);
+            Log::info("========================================");
+        }
 
         ActivityLogController::log('forgot_password', 'Auth', ['email' => $request->email]);
 
         return response()->json([
-            'message' => 'Tautan pemulihan berhasil dikirim.',
+            'message' => 'Tautan pemulihan berhasil dikirim ke email Anda.',
         ]);
     }
 

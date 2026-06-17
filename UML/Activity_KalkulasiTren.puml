@@ -1,0 +1,29 @@
+@startuml
+skinparam SwimlaneBorderThickness 2
+skinparam ActivityBackgroundColor #DCF2F1
+skinparam ActivityDiamondBackgroundColor #FFE79A
+
+|Admin|
+start
+:Memilih Menu Kalkulasi Tren (ETL);
+:Menekan Tombol "Jalankan Proses / Sinkronisasi";
+
+|Sistem|
+:Menarik Total Data Transaksi Periode Ini (T1);
+:Menarik Total Data Transaksi Periode Sebelumnya (T0);
+:Mengkalkulasi Rasio Tren = (T1 / T0) * 100;
+
+if (Apakah Rasio Tren < 100% ?) then (Ya, Turun)
+  :Tandai Kolom is_underperforming = True;
+  :Tingkatkan Angka consecutive_decline (+1);
+else (Tidak, Naik/Aman)
+  :Tandai Kolom is_underperforming = False;
+  :Reset Angka consecutive_decline menjadi 0;
+endif
+
+:Menyimpan Hasil Analisis ini ke Tabel trend_analyses;
+:Memperbarui Chart dan Indikator di Dasbor BI;
+
+|Admin|
+stop
+@enduml

@@ -1,6 +1,37 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { api } from '../services/api';
-import { Package, Plus, Edit2, Trash2, X, Search, Filter, Eye, History, TrendingUp } from 'lucide-react';
+import { Package, Plus, Edit2, Trash2, X, Search, Filter, Eye, History, TrendingUp, Upload, Download } from 'lucide-react';
+import Swal from 'sweetalert2';
+
+/* ───── Skeleton Components ───── */
+const Shimmer = ({ className = '' }) => (
+    <div className={`animate-shimmer rounded ${className}`} />
+);
+
+const SkeletonProductTable = () => (
+    <div className="bg-white rounded-xl shadow-sm border border-accent/10 overflow-hidden">
+        <div className="px-6 py-5 border-b border-accent/10 bg-surface/30">
+            <Shimmer className="h-4 w-48" />
+        </div>
+        <div className="px-6 py-4 bg-surface/50 grid grid-cols-7 gap-4">
+            {[...Array(7)].map((_,i) => <Shimmer key={i} className="h-3" />)}
+        </div>
+        {[...Array(8)].map((_,i) => (
+            <div key={i} className="px-6 py-4 border-t border-accent/5 grid grid-cols-7 gap-4 items-center">
+                <Shimmer className="h-4 col-span-1" />
+                <Shimmer className="h-3 col-span-1 w-3/4" />
+                <Shimmer className="h-5 w-20 rounded-full" />
+                <Shimmer className="h-4 col-span-1 w-2/3" />
+                <Shimmer className="h-4 col-span-1 w-1/2" />
+                <Shimmer className="h-5 w-14 rounded-full mx-auto" />
+                <div className="flex justify-end gap-2">
+                    <Shimmer className="h-8 w-8 rounded" />
+                    <Shimmer className="h-8 w-8 rounded" />
+                </div>
+            </div>
+        ))}
+    </div>
+);
 
 export default function Products() {
     const [products, setProducts] = useState([]);
@@ -28,6 +59,44 @@ export default function Products() {
 
     const user = JSON.parse(localStorage.getItem('user'));
     const isOwner = user?.role === 'owner';
+
+    const fileInputRef = useRef(null);
+    const [importing, setImporting] = useState(false);
+
+    const handleImport = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const uploadData = new FormData();
+        uploadData.append('file', file);
+        setImporting(true);
+
+        try {
+            await api.importProducts(uploadData);
+            Swal.fire('Berhasil', 'Data produk berhasil diimpor.', 'success');
+            fetchData(1);
+        } catch (error) {
+            Swal.fire('Gagal', error.response?.data?.message || 'Gagal mengimpor produk', 'error');
+        } finally {
+            setImporting(false);
+            e.target.value = null; // reset
+        }
+    };
+
+    const handleDownloadTemplate = async () => {
+        try {
+            const blob = await api.downloadProductTemplate();
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', 'template_produk.csv');
+            document.body.appendChild(link);
+            link.click();
+            link.parentNode.removeChild(link);
+        } catch (e) {
+            Swal.fire('Gagal', 'Tidak dapat mengunduh template', 'error');
+        }
+    };
 
     const fetchData = async (p = page) => {
         setLoading(true);
@@ -91,19 +160,51 @@ export default function Products() {
             setIsModalOpen(false);
             fetchData();
         } catch (e) {
-            alert(e.response?.data?.message || 'Gagal menyimpan produk');
+            Swal.fire({
+                icon: 'error',
+                title: 'Gagal Menyimpan',
+                text: e.response?.data?.message || 'Gagal menyimpan produk',
+                confirmButtonColor: '#456254',
+            });
         } finally {
             setSaving(false);
         }
     };
 
     const handleDelete = async (product) => {
-        if (!confirm(`Yakin ingin menonaktifkan produk ${product.name}?`)) return;
+        const result = await Swal.fire({
+            title: 'Nonaktifkan Produk?',
+            html: `<p class="text-sm text-gray-600">Produk <strong>"${product.name}"</strong> (${product.sku}) akan dinonaktifkan dan tidak ditampilkan di katalog.</p>`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#dc2626',
+            cancelButtonColor: '#6b7280',
+            confirmButtonText: 'Ya, Nonaktifkan',
+            cancelButtonText: 'Batal',
+            reverseButtons: true,
+            focusCancel: true,
+        });
+
+        if (!result.isConfirmed) return;
+
         try {
             await api.deleteProduct(product.id);
+            Swal.fire({
+                icon: 'success',
+                title: 'Berhasil',
+                text: `Produk "${product.name}" telah dinonaktifkan.`,
+                confirmButtonColor: '#456254',
+                timer: 2000,
+                showConfirmButton: false,
+            });
             fetchData();
         } catch (e) {
-            alert(e.response?.data?.message || 'Gagal menonaktifkan produk');
+            Swal.fire({
+                icon: 'error',
+                title: 'Gagal',
+                text: e.response?.data?.message || 'Gagal menonaktifkan produk',
+                confirmButtonColor: '#456254',
+            });
         }
     };
 
@@ -118,7 +219,7 @@ export default function Products() {
                 transactions: res.product?.transactions || []
             });
         } catch (e) {
-            alert('Gagal memuat detail produk');
+            Swal.fire({ icon: 'error', title: 'Error', text: 'Gagal memuat detail produk', confirmButtonColor: '#456254' });
         }
     };
 
@@ -130,12 +231,35 @@ export default function Products() {
                     <p className="text-accent font-medium mt-1">Daftar inventaris dan harga saat ini</p>
                 </div>
                 {!isOwner && (
-                    <button
-                        onClick={() => openModal()}
-                        className="bg-[#456254] text-white px-5 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 hover:bg-[#384f44] transition-colors"
-                    >
-                        <Plus size={16} /> Tambah Produk
-                    </button>
+                    <div className="flex gap-2">
+                        <button
+                            onClick={handleDownloadTemplate}
+                            className="bg-surface text-primary px-3 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 hover:bg-surface-variant transition-colors border border-accent/20"
+                            title="Download Template CSV"
+                        >
+                            <Download size={16} /> Template
+                        </button>
+                        <input 
+                            type="file" 
+                            accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" 
+                            ref={fileInputRef} 
+                            onChange={handleImport} 
+                            style={{ display: 'none' }} 
+                        />
+                        <button
+                            onClick={() => fileInputRef.current.click()}
+                            disabled={importing}
+                            className="bg-white border border-primary text-primary px-4 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 hover:bg-surface transition-colors disabled:opacity-50"
+                        >
+                            <Upload size={16} /> {importing ? 'Mengimpor...' : 'Import Excel'}
+                        </button>
+                        <button
+                            onClick={() => openModal()}
+                            className="bg-[#456254] text-white px-5 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 hover:bg-[#384f44] transition-colors"
+                        >
+                            <Plus size={16} /> Tambah Produk
+                        </button>
+                    </div>
                 )}
             </div>
 
@@ -166,6 +290,10 @@ export default function Products() {
                 </div>
             </div>
 
+            {/* Skeleton Loading State */}
+            {loading && products.length === 0 ? (
+                <SkeletonProductTable />
+            ) : (
             <div className="bg-white rounded-xl shadow-sm border border-accent/10 overflow-hidden relative min-h-[400px]">
                 {loading && (
                     <div className="absolute inset-0 bg-white/60 z-10 flex items-center justify-center backdrop-blur-sm">
@@ -261,6 +389,7 @@ export default function Products() {
                     </div>
                 )}
             </div>
+            )}
 
             {/* Modal Detail View */}
             {detailModalOpen && (
@@ -272,7 +401,21 @@ export default function Products() {
                         </div>
                         <div className="overflow-y-auto flex-1 p-6">
                             {!productDetail ? (
-                                <div className="py-12 flex justify-center"><div className="w-8 h-8 border-4 border-surface border-t-primary rounded-full animate-spin"></div></div>
+                                <div className="space-y-4 py-4">
+                                    <div className="flex gap-4 p-4 border rounded-xl border-accent/10">
+                                        <Shimmer className="w-16 h-16 rounded-lg" />
+                                        <div className="flex-1 space-y-2">
+                                            <Shimmer className="h-5 w-48" />
+                                            <Shimmer className="h-3 w-32" />
+                                        </div>
+                                        <Shimmer className="h-6 w-28" />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <Shimmer className="h-24 rounded-xl" />
+                                        <Shimmer className="h-24 rounded-xl" />
+                                    </div>
+                                    <Shimmer className="h-40 rounded-xl" />
+                                </div>
                             ) : (
                                 <div className="space-y-6">
                                     <div className="flex gap-4 p-4 border rounded-xl border-accent/20 shadow-sm">

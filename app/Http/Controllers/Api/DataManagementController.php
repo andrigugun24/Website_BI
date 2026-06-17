@@ -71,6 +71,9 @@ class DataManagementController extends Controller
                 $request->user()->id
             );
 
+            // Generate notification for successful import
+            \App\Services\NotificationService::notifyDataImport($processed);
+
             return response()->json([
                 'message'          => 'Data berhasil diimpor.',
                 'records_processed'=> $processed,

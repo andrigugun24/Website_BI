@@ -1,0 +1,103 @@
+@startuml Sequence_Transaksi
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam sequence {
+  ParticipantBackgroundColor #EBF5FB
+  ParticipantBorderColor #2980B9
+  ArrowColor #2C3E50
+  LifeLineBorderColor #BDC3C7
+  LifeLineBackgroundColor #ECF0F1
+  ActorBackgroundColor #FDEBD0
+  ActorBorderColor #E67E22
+}
+skinparam NoteBackgroundColor #FFFDE7
+skinparam NoteBorderColor #F9A825
+
+title Sequence Diagram — Pencatatan Transaksi Penjualan
+
+actor "Admin" as Admin
+participant "React Frontend" as FE
+participant "Sanctum Middleware" as Auth
+participant "TransactionController" as TC
+participant "Product Model" as PM
+participant "NotificationService" as NS
+database "Database" as DB
+
+autonumber
+
+== Lihat Daftar Transaksi ==
+
+Admin -> FE : Akses halaman Transaksi
+FE -> Auth : GET /api/transactions?page=1&per_page=20\nAuthorization: Bearer {token}
+Auth -> Auth : Validasi token & role (admin|manager)
+Auth -> TC : index(request)
+TC -> DB : SELECT transactions WITH product, user\nORDER BY transaction_date DESC\nPAGINATED
+DB --> TC : Paginated transactions
+TC --> FE : 200 { data, meta }
+FE --> Admin : Tampilkan tabel transaksi
+
+== Tambah Transaksi Manual ==
+
+Admin -> FE : Klik "Tambah Transaksi"
+FE -> Auth : GET /api/products\n(untuk dropdown pilih produk)
+Auth -> DB : SELECT active products
+DB --> FE : Daftar produk
+
+Admin -> FE : Pilih produk, isi:\n- tanggal transaksi\n- jumlah terjual\n- harga satuan\n- referensi order
+
+FE -> Auth : POST /api/transactions\nAuthorization: Bearer {token}\n{ product_id, transaction_date,\n  quantity_sold, unit_price,\n  order_ref }
+
+Auth -> Auth : Cek role: admin only
+
+alt Bukan Admin
+  Auth --> FE : 403 Forbidden
+  FE --> Admin : Tidak dapat tambah transaksi
+end
+
+Auth -> TC : store(request)
+
+TC -> TC : Validasi:\n- product_id exists di products\n- quantity_sold >= 1\n- unit_price >= 0
+
+alt Validasi gagal
+  TC --> FE : 422 { errors }
+  FE --> Admin : Tampilkan error
+end
+
+TC -> TC : Hitung:\ntotal_amount = quantity_sold × unit_price\nsource = "manual"\nuser_id = auth.user.id
+
+TC -> DB : INSERT INTO transactions\n{ product_id, user_id, transaction_date,\n  quantity_sold, unit_price, total_amount,\n  source: "manual", order_ref }
+
+DB --> TC : Transaction record
+
+TC -> PM : product.decrement(\n"current_stock", quantity_sold)
+PM -> DB : UPDATE products\nSET current_stock = current_stock - quantity_sold
+DB --> PM : Updated
+
+TC -> PM : product.refresh()
+PM -> DB : SELECT product WHERE id = ?
+DB --> PM : Fresh product data
+
+TC -> NS : NotificationService::checkLowStock(product)
+
+NS -> NS : Cek:\ncurrent_stock <= min_stock_threshold?
+
+alt Stok rendah
+  NS -> DB : INSERT INTO notifications\n{ type: "low_stock",\n  message: "Stok {produk} menipis",\n  metadata: { product_id, stock } }
+  DB --> NS : Notification record
+end
+
+TC --> FE : 201 Created\n{ message, transaction: { ...with product } }
+
+FE --> Admin : Tutup modal\nRefresh daftar transaksi\nTampilkan notifikasi sukses
+
+== Lihat Ringkasan Penjualan ==
+
+Admin -> FE : Pilih tab "Ringkasan"\nSet rentang tanggal & group by
+FE -> Auth : GET /api/transactions/summary\n?group_by=month\n&start_date=2025-01-01\n&end_date=2025-12-31
+Auth -> TC : summary(request)
+TC -> DB : SELECT\n  DATE_FORMAT(transaction_date, '%Y-%m') as period,\n  SUM(total_amount) as revenue,\n  SUM(quantity_sold) as qty_sold,\n  COUNT(*) as trx_count\nFROM transactions\nWHERE transaction_date BETWEEN ?\nGROUP BY period\nORDER BY period
+DB --> TC : Summary rows
+TC --> FE : 200 [ { period, revenue, qty_sold, trx_count }, ... ]
+FE --> Admin : Tampilkan grafik/tabel ringkasan
+
+@enduml

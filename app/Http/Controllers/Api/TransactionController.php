@@ -8,6 +8,8 @@ use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Imports\TransactionImport;
+use Maatwebsite\Excel\Facades\Excel;
 
 class TransactionController extends Controller
 {
@@ -64,6 +66,10 @@ class TransactionController extends Controller
         // Update product stock
         $transaction->product->decrement('current_stock', $validated['quantity_sold']);
 
+        // Check for low stock and generate notification if needed
+        $transaction->product->refresh();
+        \App\Services\NotificationService::checkLowStock($transaction->product);
+
         return response()->json([
             'message'     => 'Transaksi berhasil dicatat.',
             'transaction' => $transaction->load('product'),
@@ -107,5 +113,38 @@ class TransactionController extends Controller
             ->get();
 
         return response()->json($summary);
+    }
+
+    /**
+     * Import transactions from Excel/CSV.
+     */
+    public function import(Request $request): JsonResponse
+    {
+        $request->validate([
+            'file' => 'required|file|mimes:xlsx,xls,csv,txt|max:10240',
+        ]);
+
+        Excel::import(new TransactionImport, $request->file('file'));
+
+        return response()->json([
+            'message' => 'Transaksi berhasil diimpor dan stok telah diperbarui.'
+        ]);
+    }
+
+    /**
+     * Download CSV template for transaction import.
+     */
+    public function downloadTemplate()
+    {
+        $headers = [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => 'attachment; filename="template_transaksi.csv"',
+        ];
+
+        $content = "product_sku,transaction_date,quantity_sold,unit_price,order_ref\n";
+        $content .= "PROD-001,2026-06-17,2,150000,INV-001\n";
+        $content .= "PROD-002,,1,,INV-002\n"; // Kosongkan tanggal untuk pakai hari ini, kosongkan harga untuk pakai harga master
+
+        return response($content, 200, $headers);
     }
 }

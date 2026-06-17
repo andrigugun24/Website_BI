@@ -1,0 +1,37 @@
+@startuml
+skinparam SwimlaneBorderThickness 2
+skinparam ActivityBackgroundColor #DCF2F1
+
+|Admin|
+start
+:Mengklik Menu Master Data \n(Data Siswa/Produk/Transaksi);
+|Sistem|
+:Menampilkan Tabel Daftar Data;
+
+|Admin|
+:Menentukan Aksi (Tambah/Edit/Hapus);
+if (Apa Aksi yang Dipilih?) then (Tambah / Edit)
+  |Admin|
+  :Membuka Form Inputan;
+  :Mengetik Data ke dalam Form;
+  :Menekan Tombol "Simpan";
+  
+  |Sistem|
+  :Memvalidasi Inputan Form;
+  :Menyimpan Perubahan ke Database MySQL;
+
+else (Hapus)
+  |Admin|
+  :Mengklik Tombol "Hapus";
+  :Mengonfirmasi Pop-up Penghapusan;
+  
+  |Sistem|
+  :Menghapus Data dari Database MySQL;
+endif
+
+|Sistem|
+:Mereset dan Memperbarui Tampilan Tabel;
+
+|Admin|
+stop
+@enduml

@@ -1,0 +1,110 @@
+@startuml Sequence_Laporan
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam sequence {
+  ParticipantBackgroundColor #EBF5FB
+  ParticipantBorderColor #2980B9
+  ArrowColor #2C3E50
+  LifeLineBorderColor #BDC3C7
+  LifeLineBackgroundColor #ECF0F1
+  ActorBackgroundColor #FDEBD0
+  ActorBorderColor #E67E22
+}
+skinparam NoteBackgroundColor #FFFDE7
+skinparam NoteBorderColor #F9A825
+
+title Sequence Diagram — Ekspor Laporan (CSV & PDF)
+
+actor "Pengguna" as User
+participant "React Frontend" as FE
+participant "Sanctum Middleware" as Auth
+participant "ReportController" as RC
+database "Database" as DB
+
+autonumber
+
+== Pratinjau Laporan ==
+
+User -> FE : Akses halaman Laporan\nSet parameter (periode, filter)
+FE -> Auth : GET /api/reports/preview\n?start_date=2025-01-01\n&end_date=2025-12-31
+
+Auth -> Auth : Validasi token (semua role)
+Auth -> RC : preview(request)
+
+RC -> DB : Query data laporan:\nSELECT p.name, t.transaction_date,\n  t.quantity_sold, t.total_amount,\n  t.source\nFROM transactions t\nJOIN products p ON t.product_id = p.id\nWHERE t.transaction_date BETWEEN ?\nORDER BY t.transaction_date DESC
+
+DB --> RC : Data laporan
+
+RC -> RC : Format data untuk pratinjau\n(ringkasan per produk\n& total)
+
+RC --> FE : 200 { data, summary: { total_revenue,\n  total_qty, period } }
+
+FE --> User : Tampilkan tabel pratinjau laporan
+
+== Export CSV ==
+
+User -> FE : Klik "Export CSV"
+FE -> Auth : GET /api/reports/export/csv\n?start_date=...\n&end_date=...\nAuthorization: Bearer {token}
+
+Auth -> Auth : Cek role: admin|manager only
+
+alt Bukan Admin/Manager
+  Auth --> FE : 403 Forbidden
+  FE --> User : Tampilkan pesan tidak diizinkan
+end
+
+Auth -> RC : exportCsv(request)
+
+RC -> DB : Query semua data transaksi\nsesuai filter (tidak paginated)
+
+DB --> RC : Full dataset
+
+RC -> RC : Build CSV:\n- Header: Tanggal, Produk, SKU,\n  Kategori, Qty, Harga, Total, Sumber\n- Data rows
+
+RC --> FE : 200 Response\nContent-Type: text/csv\nContent-Disposition: attachment;\n  filename="laporan_2025.csv"\n[CSV stream]
+
+FE --> User : Browser download file CSV
+
+== Export PDF ==
+
+User -> FE : Klik "Export PDF"
+FE -> Auth : GET /api/reports/export/pdf\n?start_date=...\n&end_date=...
+
+Auth -> Auth : Validasi token (semua role)
+Auth -> RC : exportPdf(request)
+
+RC -> DB : Query data laporan
+
+DB --> RC : Dataset
+
+RC -> RC : Cek role pengguna
+
+alt Role: Owner
+  RC -> RC : Buat laporan ringkasan:\n- Total pendapatan\n- Top 5 produk\n- Grafik tren\n(tanpa detail per transaksi)
+else Role: Admin/Manager
+  RC -> RC : Buat laporan lengkap:\n- Detail semua transaksi\n- Analisis per produk\n- Grafik heatmap\n- Daftar underperforming
+end
+
+RC -> RC : Render HTML template\nkonversi ke PDF
+
+RC --> FE : 200 Response\nContent-Type: application/pdf\nContent-Disposition: attachment;\n  filename="laporan_2025.pdf"\n[PDF stream]
+
+FE --> User : Browser download/preview PDF
+
+== Laporan Tren ==
+
+User -> FE : Klik "Laporan Tren"
+FE -> Auth : GET /api/reports/trend\n?period=2025-01
+
+Auth -> Auth : Cek role: admin|manager only
+Auth -> RC : trendReport(request)
+
+RC -> DB : SELECT ta.*, p.name, p.sku, p.category\nFROM trend_analyses ta\nJOIN products p ON ta.product_id = p.id\nWHERE ta.period_start >= ?\nORDER BY ta.trend_ratio ASC
+
+DB --> RC : Trend data with products
+
+RC --> FE : 200 { data: [...trend with product],\n  summary: { total, underperforming,\n  avg_ratio, period } }
+
+FE --> User : Tampilkan laporan tren\ndengan visualisasi
+
+@enduml

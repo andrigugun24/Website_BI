@@ -10,6 +10,7 @@ import DataManagement from './pages/DataManagement';
 import Settings from './pages/Settings';
 import Users from './pages/Users';
 import Transactions from './pages/Transactions';
+import StockRequests from './pages/StockRequests';
 import ResetPassword from './pages/ResetPassword';
 
 const PrivateRoute = ({ children, adminOnly = false }) => {
@@ -37,6 +38,7 @@ export default function App() {
                 <Route path="/" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
                 <Route path="/trend" element={<PrivateRoute><TrendAnalysis /></PrivateRoute>} />
                 <Route path="/products" element={<PrivateRoute><Products /></PrivateRoute>} />
+                <Route path="/stock-requests" element={<PrivateRoute><StockRequests /></PrivateRoute>} />
                 <Route path="/transactions" element={<PrivateRoute><Transactions /></PrivateRoute>} />
                 <Route path="/reports" element={<PrivateRoute><Reports /></PrivateRoute>} />
                 <Route path="/data" element={<PrivateRoute adminOnly><DataManagement /></PrivateRoute>} />

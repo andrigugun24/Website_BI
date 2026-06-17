@@ -1,0 +1,30 @@
+@startuml
+skinparam maxMessageSize 150
+skinparam ParticipantPadding 20
+
+actor Pengguna
+boundary "Halaman Login\n(View)" as View
+control "AuthController\n(Controller)" as Controller
+entity "User\n(Model)" as Model
+database "MySQL\n(Database)" as DB
+
+Pengguna -> View ++ : Memasukkan Email & Password
+View -> Controller ++ : POST Data Kredensial Login
+
+Controller -> Model ++ : Cari Data by Email
+Model -> DB ++ : Query: SELECT * WHERE email=...
+DB --> Model -- : Return Data Row & Hash Password
+Model --> Controller -- : Return Objek User
+
+Controller -> Controller : Verifikasi Hash Password
+
+alt Jika Kredensial Valid
+    Controller -> Controller : Set Auth Session
+    Controller --> View : Redirect ke Dashboard Utama
+    View --> Pengguna : Menampilkan Dashboard
+else Jika Kredensial Tidak Valid
+    Controller --> View : Redirect Back (Error)
+    View --> Pengguna -- : Menampilkan Peringatan Error
+end
+deactivate Controller
+@enduml

@@ -1,0 +1,210 @@
+@startuml UseCase_Diagram
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam usecase {
+  BackgroundColor #E8F4FD
+  BorderColor #2980B9
+  ArrowColor #2C3E50
+}
+skinparam actor {
+  BackgroundColor #FDEBD0
+  BorderColor #E67E22
+}
+skinparam packageStyle rectangle
+skinparam linetype ortho
+
+title Use Case Diagram — Sistem Business Intelligence Tataruma
+
+' ── Actors ──────────────────────────────────────────────────────────────
+actor "Admin" as Admin
+actor "Manager" as Manager
+actor "Owner" as Owner
+
+rectangle "Sistem BI Tataruma" {
+
+  ' ── Authentication ────────────────────────────────────────────────────
+  package "Autentikasi" {
+    usecase "Login" as UC_Login
+    usecase "Logout" as UC_Logout
+    usecase "Lupa Password" as UC_ForgotPass
+    usecase "Reset Password" as UC_ResetPass
+    usecase "Ubah Profil" as UC_EditProfile
+    usecase "Ubah Password" as UC_ChangePass
+  }
+
+  ' ── Data Master ──────────────────────────────────────────────────────
+  package "Manajemen Produk" {
+    usecase "Lihat Daftar Produk" as UC_ProdList
+    usecase "Tambah Produk" as UC_ProdAdd
+    usecase "Edit Produk" as UC_ProdEdit
+    usecase "Nonaktifkan Produk" as UC_ProdDeact
+    usecase "Lihat Detail Produk" as UC_ProdDetail
+    usecase "Filter Produk" as UC_ProdFilter
+    usecase "Lihat Kategori" as UC_ProdCat
+  }
+
+  ' ── Transactions ─────────────────────────────────────────────────────
+  package "Manajemen Transaksi" {
+    usecase "Lihat Daftar Transaksi" as UC_TrxList
+    usecase "Tambah Transaksi Manual" as UC_TrxAdd
+    usecase "Lihat Detail Transaksi" as UC_TrxDetail
+    usecase "Ringkasan Penjualan" as UC_TrxSummary
+    usecase "Filter Transaksi" as UC_TrxFilter
+  }
+
+  ' ── Analytics ────────────────────────────────────────────────────────
+  package "Analitik & Tren" {
+    usecase "Lihat Analisis Tren" as UC_Trend
+    usecase "Hitung Rasio Tren" as UC_CalcTrend
+    usecase "Produk Underperforming" as UC_Underperform
+    usecase "Heatmap Penjualan" as UC_Heatmap
+    usecase "Perbandingan Periode" as UC_PeriodComp
+  }
+
+  ' ── Dashboard ────────────────────────────────────────────────────────
+  package "Dashboard" {
+    usecase "Lihat Dashboard" as UC_Dashboard
+    usecase "Statistik Ringkasan" as UC_Stats
+    usecase "Notifikasi Stok Rendah" as UC_StockNotif
+  }
+
+  ' ── Reports ──────────────────────────────────────────────────────────
+  package "Laporan" {
+    usecase "Pratinjau Laporan" as UC_ReportPreview
+    usecase "Export CSV" as UC_ExportCSV
+    usecase "Export PDF" as UC_ExportPDF
+    usecase "Laporan Tren" as UC_TrendReport
+  }
+
+  ' ── Data Management ──────────────────────────────────────────────────
+  package "Manajemen Data" {
+    usecase "Jalankan ETL" as UC_ETL
+    usecase "Lihat Log ETL" as UC_ETLLog
+    usecase "Import Data" as UC_Import
+  }
+
+  ' ── User Management ──────────────────────────────────────────────────
+  package "Manajemen Pengguna" {
+    usecase "Lihat Daftar Pengguna" as UC_UserList
+    usecase "Tambah Pengguna" as UC_UserAdd
+    usecase "Edit Pengguna" as UC_UserEdit
+    usecase "Hapus/Nonaktifkan Pengguna" as UC_UserDel
+    usecase "Kelola Role" as UC_Roles
+  }
+
+  ' ── Settings ─────────────────────────────────────────────────────────
+  package "Pengaturan" {
+    usecase "Lihat Pengaturan" as UC_SettingView
+    usecase "Ubah Pengaturan Sistem" as UC_SettingEdit
+    usecase "Lihat Activity Log" as UC_ActivityLog
+    usecase "Kelola Notifikasi" as UC_Notifications
+  }
+}
+
+' ── Admin Relationships ──────────────────────────────────────────────────
+Admin --> UC_Login
+Admin --> UC_Logout
+Admin --> UC_ForgotPass
+Admin --> UC_EditProfile
+Admin --> UC_ChangePass
+
+Admin --> UC_ProdList
+Admin --> UC_ProdAdd
+Admin --> UC_ProdEdit
+Admin --> UC_ProdDeact
+Admin --> UC_ProdDetail
+Admin --> UC_ProdFilter
+Admin --> UC_ProdCat
+
+Admin --> UC_TrxList
+Admin --> UC_TrxAdd
+Admin --> UC_TrxDetail
+Admin --> UC_TrxSummary
+Admin --> UC_TrxFilter
+
+Admin --> UC_Trend
+Admin --> UC_CalcTrend
+Admin --> UC_Underperform
+Admin --> UC_Heatmap
+Admin --> UC_PeriodComp
+
+Admin --> UC_Dashboard
+
+Admin --> UC_ReportPreview
+Admin --> UC_ExportCSV
+Admin --> UC_ExportPDF
+Admin --> UC_TrendReport
+
+Admin --> UC_ETL
+Admin --> UC_ETLLog
+Admin --> UC_Import
+
+Admin --> UC_UserList
+Admin --> UC_UserAdd
+Admin --> UC_UserEdit
+Admin --> UC_UserDel
+Admin --> UC_Roles
+
+Admin --> UC_SettingView
+Admin --> UC_SettingEdit
+Admin --> UC_ActivityLog
+Admin --> UC_Notifications
+
+' ── Manager Relationships ────────────────────────────────────────────────
+Manager --> UC_Login
+Manager --> UC_Logout
+Manager --> UC_ForgotPass
+Manager --> UC_EditProfile
+Manager --> UC_ChangePass
+
+Manager --> UC_ProdList
+Manager --> UC_ProdDetail
+Manager --> UC_ProdFilter
+Manager --> UC_ProdCat
+
+Manager --> UC_TrxList
+Manager --> UC_TrxDetail
+Manager --> UC_TrxSummary
+Manager --> UC_TrxFilter
+
+Manager --> UC_Trend
+Manager --> UC_Underperform
+Manager --> UC_Heatmap
+Manager --> UC_PeriodComp
+
+Manager --> UC_Dashboard
+
+Manager --> UC_ReportPreview
+Manager --> UC_ExportCSV
+Manager --> UC_ExportPDF
+Manager --> UC_TrendReport
+
+Manager --> UC_SettingView
+Manager --> UC_Notifications
+
+' ── Owner Relationships ──────────────────────────────────────────────────
+Owner --> UC_Login
+Owner --> UC_Logout
+Owner --> UC_ForgotPass
+Owner --> UC_EditProfile
+Owner --> UC_ChangePass
+
+Owner --> UC_Dashboard
+Owner --> UC_Underperform
+
+Owner --> UC_ReportPreview
+Owner --> UC_ExportPDF
+
+Owner --> UC_SettingView
+Owner --> UC_Notifications
+
+' ── Include / Extend ────────────────────────────────────────────────────
+UC_ForgotPass .> UC_ResetPass : <<include>>
+UC_ProdList .> UC_ProdFilter : <<extend>>
+UC_TrxList .> UC_TrxFilter : <<extend>>
+UC_Dashboard .> UC_Stats : <<include>>
+UC_Dashboard .> UC_StockNotif : <<extend>>
+UC_TrxAdd .> UC_StockNotif : <<extend>>
+UC_Underperform .> UC_Stats : <<include>>
+
+@enduml

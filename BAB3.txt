@@ -1,0 +1,286 @@
+BAB III
+ANALISA DAN PERANCANGAN SISTEM
+
+3.1 Analisa Sistem
+Analisa sistem dilakukan untuk membedakan proses bisnis lama dengan sistem informasi yang diusulkan agar terlihat nilai tambah yang diberikan.
+
+3.1.1 Perbandingan Sistem Berjalan dan Sistem Usulan
+Tabel 3.1 Perbandingan Sistem
+
+| Kriteria | Sistem Berjalan (Manual/Excel) | Sistem Usulan (Tataruma BI) |
+| :--- | :--- | :--- |
+| Kecepatan Data | Lambat, perlu input manual satu per satu. | Cepat, otomatisasi penarikan & olah data. |
+| Akurasi | Rentan terhadap Human Error. | Tinggi, validasi sistematis. |
+| Aksesibilitas | File terbatas pada komputer tertentu. | Cloud-based, akses kapan saja & di mana saja. |
+| Analisis Tren | Harus membuat rumus manual di Excel. | Otomatis melalui modul Trend Analysis. |
+| Keamanan | Password file mudah ditembus. | Role-Based Access Control (RBAC) & Enkripsi. |
+| Visualisasi | Statis, perlu update chart manual. | Dinamis & Real-time Dashboard. |
+
+3.2 Perancangan Basis Data
+Sistem menggunakan basis data relasional MySQL. Berikut adalah Kamus Data (Data Dictionary) untuk tabel-tabel utama:
+
+1. Tabel roles (Tingkatan Akses)
+- id (BigInt, PK, AI): Identifikasi unik role.
+- name (Varchar, 50): Nama role (Administrator, Manager, Owner).
+- slug (Varchar, 50, Unique): Identifier unik role untuk pengecekan logic.
+
+2. Tabel users (Pengguna)
+- id (BigInt, PK, AI): Identifikasi unik user.
+- role_id (BigInt, FK): Referensi ke tabel roles.
+- name (Varchar, 255): Nama lengkap pengguna.
+- email (Varchar, 255, Unique): Alamat email untuk login.
+- password (Varchar, 255): Hash password pengguna.
+- is_active (Boolean): Status keaktifan akun.
+
+3. Tabel products (Produk)
+- id (BigInt, PK, AI): Identifikasi unik produk.
+- sku (Varchar, 50, Unique): Stock Keeping Unit produk.
+- name (Varchar, 255): Nama produk.
+- category (Varchar, 100): Kategori produk.
+- base_price (Decimal 15,2): Harga pokok produk.
+- status (Enum): 'active', 'inactive'.
+
+4. Tabel transactions (Transaksi Penjualan)
+- id (BigInt, PK, AI): Identifikasi unik transaksi.
+- product_id (BigInt, FK): Referensi ke tabel products.
+- user_id (BigInt, FK): Referensi ke tabel users (sales/inputer).
+- transaction_date (Date): Tanggal terjadinya transaksi.
+- quantity_sold (Int): Jumlah unit yang terjual.
+- total_amount (Decimal 15,2): Total nilai transaksi (Qty * Price).
+
+5. Tabel trend_analyses (Hasil Analisis BI)
+- id (BigInt, PK, AI): Identifikasi unik analisis.
+- product_id (BigInt, FK): Referensi ke produk yang dianalisis.
+- period_start (Date): Awal periode analisis saat ini.
+- period_end (Date): Akhir periode analisis saat ini.
+- trend_ratio (Decimal 5,2): Persentase pertumbuhan/penurunan (%).
+- is_underperforming (Boolean): Flag jika performa menurun (< 100%).
+- consecutive_decline (Int): Jumlah periode penurunan beruntun.
+
+3.3 Perancangan UML (Unified Modeling Language)
+
+3.3.1 Class Diagram
+Menunjukkan struktur kelas dan hubungan antar entitas.
+Mermaid Code:
+```mermaid
+classDiagram
+    Role "1" -- "0..*" User : memiliki
+    User "1" -- "0..*" Transaction : mencatat
+    Product "1" -- "0..*" Transaction : dipesan dalam
+    Product "1" -- "0..*" TrendAnalysis : dianalisis dalam
+
+    class Role {
+        +int id
+        +string name
+        +string slug
+    }
+    class User {
+        +int id
+        +int role_id
+        +string name
+        +string email
+        +string password
+        +isAdmin() bool
+    }
+    class Product {
+        +int id
+        +string sku
+        +string name
+        +string category
+        +decimal base_price
+    }
+    class Transaction {
+        +int id
+        +int product_id
+        +int user_id
+        +date transaction_date
+        +int quantity_sold
+        +decimal total_amount
+    }
+    class TrendAnalysis {
+        +int id
+        +int product_id
+        +decimal trend_ratio
+        +bool is_underperforming
+        +int consecutive_decline
+    }
+```
+
+3.3.2 Use Case Diagram & Deskripsi
+Mermaid Code:
+```mermaid
+usecaseDiagram
+    actor "Admin" as A
+    actor "Manager" as M
+    actor "Owner" as O
+
+    A --> (Login)
+    A --> (Kelola Master Data)
+    A --> (Otomatisasi ETL & Tren)
+    A --> (Lihat Laporan Detail)
+
+    M --> (Login)
+    M --> (Lihat Dashboard BI)
+    M --> (Analisis Produk Underperforming)
+
+    O --> (Login)
+    O --> (Lihat Ringkasan Eksekutif)
+```
+
+Deskripsi Use Case:
+1. Login: Proses autentikasi pengguna masuk ke sistem.
+2. Kelola Master Data: Menambah, mengubah, dan menghapus data User, Produk, dan Transaksi (Admin Only).
+3. Otomatisasi ETL & Tren: Proses sistem menarik data transaksi mentah dan menghitung rasio tren (Admin Only).
+4. Analisis Produk Underperforming: Identifikasi produk yang mengalami penurunan penjualan secara beruntun.
+
+3.3.3 Activity Diagram (Proses Analisis Tren)
+Menggambarkan alur logika sistem dalam menghitung tren.
+Mermaid Code:
+```mermaid
+activityDiagram
+    start
+    :Admin memicu proses Kalkulasi Tren;
+    :Sistem mengambil data Transaksi Periode Saat Ini (T1);
+    :Sistem mengambil data Transaksi Periode Sebelumnya (T0);
+    :Hitung Rasio = (T1 / T0) * 100;
+    if (Rasio < 100?) then (Ya)
+        :Set is_underperforming = true;
+        :Update consecutive_decline (+1);
+    else (Tidak)
+        :Set is_underperforming = false;
+        :Reset consecutive_decline = 0;
+    endif
+    :Simpan ke tabel trend_analyses;
+    :Kirim Notifikasi ke Dashboard;
+    stop
+```
+
+3.3.4 Sequence Diagram
+Sequence diagram menggambarkan interaksi antar objek di dalam dan di sekitar sistem (termasuk pengguna, tampilan luar, dan operasi) dalam urutan waktu.
+
+a. Skenario Login Pengguna:
+```mermaid
+sequenceDiagram
+    actor User
+    participant View as Login UI (Frontend)
+    participant Controller as AuthController
+    participant Model as User Model
+    participant DB as MySQL Database
+
+    User->>View: Masukkan Email & Password
+    View->>Controller: Kirim Data Login (POST)
+    Controller->>Model: Cari User berdasarkan Email
+    Model->>DB: SELECT * FROM users WHERE email=...
+    DB-->>Model: Data User & Password Hash
+    Model-->>Controller: Return User Data
+    
+    alt Password Valid
+        Controller->>Controller: Create Session/Token
+        Controller-->>View: Login Berhasil (Redirect Dashboard)
+        View-->>User: Tampilkan Dashboard
+    else Password Salah
+        Controller-->>View: Error: Kredensial Salah
+        View-->>User: Tampilkan Pesan Error
+    end
+```
+
+b. Skenario Kalkulasi Tren BI:
+```mermaid
+sequenceDiagram
+    actor Admin
+    participant View as Dashboard Page
+    participant Service as AnalyticsService
+    participant DB as MySQL Database
+
+    Admin->>View: Klik Tombol "Kalkulasi Tren"
+    View->>Service: requestAnalysis()
+    Service->>DB: SELECT SUM(total) FROM transactions (T1 & T0)
+    DB-->>Service: Data Penjualan Mentah
+    Service->>Service: Hitung Rasio & Status Underperforming
+    Service->>DB: INSERT/UPDATE trend_analyses
+    DB-->>Service: Success
+    Service-->>View: Kirim Hasil & Notifikasi
+    View-->>Admin: Update Dashboard Secara Real-time
+```
+
+3.3.5 Deployment Diagram
+Menunjukkan konfigurasi fisik dari elemen-elemen pemrosesan selama runtime, mencakup perangkat keras, perangkat lunak, dan middleware.
+
+```mermaid
+graph LR
+    subgraph Client_Side [User/Client Tier]
+        PC[Web Browser - PC/Laptop]
+        Mobile[Web Browser - Smartphone]
+    end
+
+    subgraph Web_Server [Application Layer]
+        Laravel[Laravel Hosting / Cloud Server]
+        Inertia[Inertia.js / Frontend Assets]
+    end
+
+    subgraph Database_Server [Data Layer]
+        MySQL[(MySQL Database)]
+    end
+
+    PC -- HTTP/HTTPS --> Laravel
+    Mobile -- HTTP/HTTPS --> Laravel
+    Laravel -- DB Query --> MySQL
+    Inertia -- Bundled Files --> PC
+```
+
+3.3.6 Entity Relationship Diagram (ERD)
+ERD menggambarkan hubungan logis antar tabel dalam basis data sistem Tataruma BI.
+
+```mermaid
+erDiagram
+    roles ||--o{ users : "has"
+    users ||--o{ transactions : "inputs"
+    products ||--o{ transactions : "is sold in"
+    products ||--o{ trend_analyses : "is analyzed in"
+
+    roles {
+        bigint id PK
+        varchar name
+        varchar slug
+    }
+    users {
+        bigint id PK
+        bigint role_id FK
+        varchar name
+        varchar email
+        varchar password
+        boolean is_active
+    }
+    products {
+        bigint id PK
+        varchar sku
+        varchar name
+        varchar category
+        decimal base_price
+        enum status
+    }
+    transactions {
+        bigint id PK
+        bigint product_id FK
+        bigint user_id FK
+        date transaction_date
+        int quantity_sold
+        decimal total_amount
+    }
+    trend_analyses {
+        bigint id PK
+        bigint product_id FK
+        date period_start
+        date period_end
+        decimal trend_ratio
+        boolean is_underperforming
+        int consecutive_decline
+    }
+```
+
+3.4 Perancangan User Interface (Detailed)
+1. Dashboard Ringkasan: Menggunakan 4 KPI Cards (Total Revenue, Total Sales, Health Score, Underperforming Count).
+2. AI Analytical Summary: Banner statis yang memberikan narasi poin-poin penting dari data (misal: "Pendapatan tumbuh 12%").
+3. Grafik Penjualan Harian: Bar chart interaktif yang menunjukkan fluktuasi pendapatan harian.
+4. Donut Chart Distribusi: Menampilkan perbandingan kontribusi pendapatan antar kategori produk.
+5. Tabel Underperforming: Daftar produk bermasalah dilengkapi dengan nilai persentase penurunan dan rekomendasi tindakan.

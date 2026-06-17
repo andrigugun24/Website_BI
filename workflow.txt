@@ -1,0 +1,117 @@
+=========================================================
+          WORKFLOW SISTEM TATARUMA BI
+=========================================================
+
+Dokumen ini menjelaskan alur kerja (workflow) dari berbagai fitur utama dalam sistem Tataruma BI. Sistem ini dibangun dengan arsitektur Monolitik menggunakan Laravel 11 untuk Backend/API dan React 18 untuk Frontend (SPA).
+
+---------------------------------------------------------
+1. WORKFLOW AUTHENTICATION (Login & Role)
+---------------------------------------------------------
+Aktor: Semua Pengguna (Owner, Admin, Kasir, Kurir, Eksekutif)
+
+1. User mengakses halaman login.
+2. User memasukkan email dan password.
+3. Frontend mengirim request `POST /api/login` ke Backend.
+4. Backend memvalidasi kredensial (Auth::attempt).
+5. Jika sukses, Backend men-generate token (Sanctum) dan mengembalikan data user beserta Role-nya.
+6. Frontend menyimpan token di `localStorage` dan mengatur header `Authorization Bearer` untuk request Axios selanjutnya.
+7. Frontend me-redirect user ke halaman utama (Dashboard) sesuai Role.
+8. Axios interceptor (`api.js`) akan otomatis me-logout user jika menerima response 401 (token expired/invalid).
+
+---------------------------------------------------------
+2. WORKFLOW LUPA PASSWORD (Reset Password)
+---------------------------------------------------------
+Aktor: Semua Pengguna
+
+1. User menekan "Lupa Password" di halaman login.
+2. User memasukkan email terdaftar.
+3. Frontend mengirim request `POST /api/forgot-password`.
+4. Backend men-generate token acak dan menyimpannya di tabel `password_reset_tokens`.
+5. Backend membuat link reset (contoh: `http://localhost/#/reset-password?token=XYZ&email=abc@test.com`).
+6. Jika `MAIL_MAILER=smtp` di `.env`, Backend mengirimkan email ke user menggunakan `ResetPasswordMail` (Mailable template). Jika tidak, sistem akan merekam link di `laravel.log` (fallback).
+7. User klik link di email -> masuk ke halaman Reset Password di Frontend.
+8. User memasukkan password baru.
+9. Frontend mengirim request `POST /api/reset-password`.
+10. Backend memvalidasi token dan meng-update password user di database.
+
+---------------------------------------------------------
+3. WORKFLOW ETL (Extract, Transform, Load) & IMPORT CSV
+---------------------------------------------------------
+Aktor: Owner / Admin (Data Management)
+
+1. Admin masuk ke halaman "Data Management".
+2. Admin mengunggah file CSV berisikan data transaksi.
+3. Frontend menggunakan `PapaParse` untuk membaca dan memparsing CSV menjadi array of objects.
+4. Frontend mengirim data ter-parsing via `POST /api/data-management/import`.
+5. Backend memproses data tsb di `EtlService::processImportedData`.
+6. Untuk setiap baris data, sistem akan membuat entri di tabel `transactions` dan memperbarui `current_stock` di tabel `products`.
+7. Setelah selesai, NotificationService di-trigger untuk membuat notifikasi "Import Data Berhasil".
+8. Secara terpisah, Admin bisa menekan "Jalankan ETL Manual" yang akan mensinkronisasikan source data (saat ini data mock/placeholder) ke database dan men-generate "Notifikasi ETL Sukses/Gagal".
+
+---------------------------------------------------------
+4. WORKFLOW PENCATATAN TRANSAKSI & STOK
+---------------------------------------------------------
+Aktor: Kasir / Admin / Import System
+
+1. Kasir masuk ke halaman "Transactions" dan klik "Catat Penjualan Manual".
+2. Kasir melengkapi from (Pilih Produk, Tanggal, Qty, Harga).
+3. Frontend `POST /api/transactions`.
+4. Backend (`TransactionController`) membuat recod di tabel `transactions`.
+5. Backend mengurasi qty produk: `product->decrement('current_stock', qty)`.
+6. Backend memanggil `NotificationService::checkLowStock()`.
+7. Jika `current_stock` <= `min_stock_threshold`, sistem membuat notifikasi "Stok Rendah". (Dibatasi 1 notif per produk per 24 jam untuk menghindari spam).
+
+---------------------------------------------------------
+5. WORKFLOW ANALISIS TREN (Period Comparison & Heatmap)
+---------------------------------------------------------
+Aktor: Owner / Eksekutif
+
+1. Owner/Eksekutif masuk ke halaman "Trend Analysis".
+2. Frontend secara parallel request ke `/api/analytics/trend` dan `/api/analytics/heatmap`.
+3. Di tab Trend: 
+   - `TrendRatioCalculator` menghitung revenue periode saat ini (30 hari terakhir) vs periode dasar (30-60 hari yang lalu).
+   - Menghasilkan "Trend Ratio" (%).
+   - Memanggil `NotificationService::checkUnderperforming()` untuk mendeteksi produk kritis (trend < 80% atau turun berturut-turut). Notifikasi otomatis digenerate.
+4. Di tab Heatmap:
+   - Backend melakukan agregasi data (group by hari, group by jam) dari seluruh transaksi menggunakan query SQL khusus.
+   - Frontend me-render kotak intensitas warna berdasarkan `transaction_count`.
+5. Di tab Period Comparison:
+   - User memilih 2 range tanggal bebas.
+   - Frontend `GET /api/analytics/period-comparison` mengirimkan 4 parameter tanggal (base_start, base_end, current_start, current_end).
+   - Backend menghitung sales untuk masing-masing range dan men-generate komparasi per-produk secara real-time.
+   - Frontend menampilkannya dalam format Bar Chart (Recharts) ganda.
+
+---------------------------------------------------------
+6. WORKFLOW NOTIFIKASI OTOMATIS
+---------------------------------------------------------
+Aktor: Sistem Otomatis -> Dibaca oleh Owner/Admin
+
+- **Low Stock:** Dicatat setiap 1x per transaksi jika stok jatuh <= threshold.
+- **Kinerja Produk Kritis:** Dicatat setelah perhitungan/buka halaman tren.
+- **Daftar User Baru:** Dicatat saat fungsi `createUser` berhasil.
+- **ETL Status:** Dicatat setelah proses Ekstraksi Data manual berhasil/error.
+- Frontend (Layout.jsx) melakukan *long-polling* (fetch tiap beberapa menit / tiap navigasi route) endpoint `/api/notifications` untuk menarik data alert belum terbaca (is_read=false).
+- Saat dipencet, alert di mark "read" (`POST /api/notifications/:id/read`).
+
+---------------------------------------------------------
+7. WORKFLOW MANAJEMEN USER & PRODUK (SweetAlert2)
+---------------------------------------------------------
+Aktor: Admin / Owner
+
+1. Admin ingin menghapus/menonaktifkan sebuah Produk/User.
+2. Admin menekan icon "Tempat Sampah".
+3. Frontend men-trigger dialog konfirmasi dari *SweetAlert2*.
+4. Jika User klik "Batal", proses dibatalkan (tidak ada request API).
+5. Jika User klik "Ya", Frontend memanggil API `DELETE /api/products/:id` atau `DELETE /api/users/:id`.
+6. Jika sukses, SweetAlert2 pop-up sukses muncul, modal tertutup, dan fungsi fetch (`fetchData()`) dipanggil ulang untuk memperbarui tabel secara otomatis tanpa perlu reload browser.
+
+---------------------------------------------------------
+8. WORKFLOW UI & UX (Skeleton Loading)
+---------------------------------------------------------
+Aktor: Frontend Engine
+
+1. Saat User masuk ke suatu component/halaman (contoh Dashboard), state `loading = true`.
+2. Halaman TIDAK MERENDER tabel/chart asli maupun logo spinner standar.
+3. Halaman me-render `<SkeletonTransactionTable>` / `<Shimmer>` yang merupakan CSS blok abu-abu beranimasi gerak-gerak dengan ukuran yg sama persis dgn konten asli (Mencegah Layout Shift / CLS).
+4. Setelah janji Axios `Promise.all` terpenuhi di Background, state `loading = false`.
+5. Skeleton menghilang & Data asli ditampilkan seketika.

@@ -1,11 +1,49 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { api } from '../services/api';
-import { FileText, Plus, X, Search, Calendar, Database } from 'lucide-react';
+import { FileText, Plus, X, Search, Calendar, Database, Upload, Download } from 'lucide-react';
+import Swal from 'sweetalert2';
+
+/* ───── Skeleton Components ───── */
+const Shimmer = ({ className = '' }) => (
+    <div className={`animate-shimmer rounded ${className}`} />
+);
+
+const SkeletonTransactionTable = () => (
+    <div className="bg-white rounded-xl shadow-sm border border-accent/10 overflow-hidden min-h-[400px]">
+        <div className="px-6 py-5 border-b border-accent/10 bg-surface/30 flex items-center gap-2">
+            <Shimmer className="h-4 w-48" />
+        </div>
+        <div className="px-6 py-4 bg-surface/50 grid grid-cols-7 gap-4">
+            {[...Array(7)].map((_,i) => <Shimmer key={i} className="h-3" />)}
+        </div>
+        {[...Array(8)].map((_,i) => (
+            <div key={i} className="px-6 py-4 border-t border-accent/5 grid grid-cols-7 gap-4 items-center">
+                <div className="space-y-1">
+                    <Shimmer className="h-4 w-20" />
+                    <Shimmer className="h-3 w-16" />
+                </div>
+                <Shimmer className="h-3 w-16" />
+                <div className="space-y-1">
+                    <Shimmer className="h-4 w-24" />
+                    <Shimmer className="h-4 w-14 rounded" />
+                </div>
+                <Shimmer className="h-4 w-8 mx-auto" />
+                <Shimmer className="h-4 w-20 ml-auto" />
+                <Shimmer className="h-4 w-24 ml-auto" />
+                <div className="flex items-center gap-2">
+                    <Shimmer className="w-6 h-6 rounded-full" />
+                    <Shimmer className="h-3 w-12" />
+                </div>
+            </div>
+        ))}
+    </div>
+);
 
 export default function Transactions() {
     const [transactions, setTransactions] = useState([]);
     const [products, setProducts] = useState([]); // For modal dropdown
     const [loading, setLoading] = useState(true);
+    const [initialLoad, setInitialLoad] = useState(true);
     
     // Config page / meta
     const [page, setPage] = useState(1);
@@ -21,6 +59,44 @@ export default function Transactions() {
 
     const user = JSON.parse(localStorage.getItem('user'));
     const isOwner = user?.role === 'owner';
+
+    const fileInputRef = useRef(null);
+    const [importing, setImporting] = useState(false);
+
+    const handleImport = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const uploadData = new FormData();
+        uploadData.append('file', file);
+        setImporting(true);
+
+        try {
+            await api.importTransactions(uploadData);
+            Swal.fire('Berhasil', 'Transaksi berhasil diimpor.', 'success');
+            fetchData(1);
+        } catch (error) {
+            Swal.fire('Gagal', error.response?.data?.message || 'Gagal mengimpor transaksi', 'error');
+        } finally {
+            setImporting(false);
+            e.target.value = null; // reset
+        }
+    };
+
+    const handleDownloadTemplate = async () => {
+        try {
+            const blob = await api.downloadTransactionTemplate();
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', 'template_transaksi.csv');
+            document.body.appendChild(link);
+            link.click();
+            link.parentNode.removeChild(link);
+        } catch (e) {
+            Swal.fire('Gagal', 'Tidak dapat mengunduh template', 'error');
+        }
+    };
 
     const fetchData = async (p = page) => {
         setLoading(true);
@@ -38,6 +114,7 @@ export default function Transactions() {
             console.error("Transactions fetch error", e);
         } finally {
             setLoading(false);
+            setInitialLoad(false);
         }
     };
 
@@ -93,15 +170,42 @@ export default function Transactions() {
                     <p className="text-accent font-medium mt-1">Daftar penjualan harian dan manual entri</p>
                 </div>
                 {!isOwner && (
-                    <button
-                        onClick={openModal}
-                        className="bg-[#456254] text-white px-5 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 hover:bg-[#384f44] transition-colors"
-                    >
-                        <Plus size={16} /> Catat Penjualan Manual
-                    </button>
+                    <div className="flex gap-2">
+                        <button
+                            onClick={handleDownloadTemplate}
+                            className="bg-surface text-primary px-3 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 hover:bg-surface-variant transition-colors border border-accent/20"
+                            title="Download Template CSV"
+                        >
+                            <Download size={16} /> Template
+                        </button>
+                        <input 
+                            type="file" 
+                            accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" 
+                            ref={fileInputRef} 
+                            onChange={handleImport} 
+                            style={{ display: 'none' }} 
+                        />
+                        <button
+                            onClick={() => fileInputRef.current.click()}
+                            disabled={importing}
+                            className="bg-white border border-primary text-primary px-4 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 hover:bg-surface transition-colors disabled:opacity-50"
+                        >
+                            <Upload size={16} /> {importing ? 'Mengimpor...' : 'Import Excel'}
+                        </button>
+                        <button
+                            onClick={openModal}
+                            className="bg-[#456254] text-white px-5 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 hover:bg-[#384f44] transition-colors"
+                        >
+                            <Plus size={16} /> Catat Penjualan Manual
+                        </button>
+                    </div>
                 )}
             </div>
 
+            {/* Skeleton Loading for Initial Load */}
+            {initialLoad ? (
+                <SkeletonTransactionTable />
+            ) : (
             <div className="bg-white rounded-xl shadow-sm border border-accent/10 overflow-hidden relative min-h-[400px]">
                 {loading && (
                     <div className="absolute inset-0 bg-white/60 z-10 flex items-center justify-center backdrop-blur-sm">
@@ -188,6 +292,7 @@ export default function Transactions() {
                     </div>
                 )}
             </div>
+            )}
 
             {/* Modal Input Transaction */}
             {isModalOpen && (

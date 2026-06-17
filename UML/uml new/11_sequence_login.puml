@@ -1,0 +1,78 @@
+@startuml Sequence_Login
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam sequence {
+  ParticipantBackgroundColor #EBF5FB
+  ParticipantBorderColor #2980B9
+  ArrowColor #2C3E50
+  LifeLineBorderColor #BDC3C7
+  LifeLineBackgroundColor #ECF0F1
+  ActorBackgroundColor #FDEBD0
+  ActorBorderColor #E67E22
+}
+skinparam NoteBackgroundColor #FFFDE7
+skinparam NoteBorderColor #F9A825
+
+title Sequence Diagram — Proses Login
+
+actor "Pengguna" as User
+participant "React Frontend" as FE
+participant "AuthController" as AC
+participant "User Model" as UM
+participant "ActivityLog" as AL
+database "Database" as DB
+
+autonumber
+
+User -> FE : Masukkan email & password\nlalu klik Login
+
+FE -> FE : Validasi form (client-side)
+note right: Cek email format\ndan password tidak kosong
+
+FE -> AC : POST /api/login\n{ email, password }
+
+AC -> AC : Validasi request\n(required|email + required)
+
+alt Validasi gagal
+  AC --> FE : 422 Unprocessable Entity\n{ errors }
+  FE --> User : Tampilkan pesan error
+end
+
+AC -> DB : SELECT users WHERE email = ?
+DB --> AC : User record
+
+alt User tidak ditemukan
+  AC --> FE : 422 { message: "Kredensial salah" }
+  FE --> User : Tampilkan error
+end
+
+AC -> AC : Hash::check(password, user.password)
+
+alt Password tidak cocok
+  AC --> FE : 422 { message: "Kredensial salah" }
+  FE --> User : Tampilkan error
+end
+
+AC -> UM : Cek is_active
+
+alt Akun tidak aktif
+  AC --> FE : 403 { message: "Akun tidak aktif" }
+  FE --> User : Tampilkan error
+end
+
+AC -> DB : DELETE personal_access_tokens\nWHERE tokenable_id = user.id
+note right: Hapus semua token lama
+
+AC -> DB : INSERT personal_access_tokens\n{ name: "auth-token",\n  abilities: [role.slug] }
+DB --> AC : Plain text token
+
+AC -> DB : INSERT activity_logs\n{ user_id, action: "login",\n  resource: "Auth",\n  details: { ip } }
+
+AC --> FE : 200 OK\n{ message, user: { id, name,\n  email, role, role_name }, token }
+
+FE -> FE : Simpan token di localStorage\nSimpan user info di state
+
+FE --> User : Redirect ke Dashboard
+note right: Menampilkan halaman\nsesuai role pengguna
+
+@enduml

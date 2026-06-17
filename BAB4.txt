@@ -1,0 +1,86 @@
+BAB IV
+IMPLEMENTASI DAN PENGUJIAN SISTEM
+
+4.1 Spesifikasi
+Dalam membangun sistem Tataruma BI, dibutuhkan spesifikasi yang relevan agar sistem dapat berjalan dengan optimal tanpa kendala performa (lagging).
+
+4.1.1 Spesifikasi Perangkat Lunak (Versi Spesifik)
+1. Bahasa Pemrograman: PHP v8.2 (Backend) & JavaScript ES6 (Frontend).
+2. Framework Backend: Laravel v11.x (dengan Breeze/Inertia).
+3. Library UI: React.js v18.x & Tailwind CSS v3.x.
+4. Database: MariaDB / MySQL v8.0.
+5. Build Tool: Vite v5.x.
+6. Web Server: Apache 2.4.x (melalui WAMP Server).
+7. Version Control: Git v2.4x.
+
+4.2 Estimasi Jadwal Pengerjaan (GANTT style)
+Tabel 4.1 Jadwal Pengerjaan Sistem
+
+| No | Kegiatan | Bulan 1 | Bulan 2 | Bulan 3 | Bulan 4 | Bulan 5 | Bulan 6 |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| 1 | Analisa & Pengumpulan Data | [X] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 2 | Perancangan Database & UML | [ ] | [X] | [ ] | [ ] | [ ] | [ ] |
+| 3 | Frontend Development | [ ] | [ ] | [X] | [X] | [ ] | [ ] |
+| 4 | Backend & Logic Development | [ ] | [ ] | [X] | [X] | [ ] | [ ] |
+| 5 | Pengujian & Perbaikan Bug | [ ] | [ ] | [ ] | [ ] | [X] | [ ] |
+| 6 | Deployment & Dokumentasi | [ ] | [ ] | [ ] | [ ] | [ ] | [X] |
+
+4.3 Implementasi Sistem Interface (Expanded)
+
+1. Dashboard Ringkasan Eksekutif:
+   - Implementasi 4 card statistik utama (KPI) dengan indikator pertumbuhan (%) berwarna hijau (naik) atau merah (turun).
+   - Card Total Pendapatan menggunakan format mata uang Rupiah (IDR).
+   - Card Kesehatan Produk menampilkan progress bar rasio produk sehat vs underperforming.
+
+2. AI Analytical Summary:
+   - Komponen banner dinamis yang menghasilkan rangkapan poin-poin utama berdasarkan data bulan berjalan.
+   - Menggunakan ikon Sparkles (Lucide-React) untuk memberikan kesan modern dan futuristik (Premium Design).
+
+3. Grafik Tren Penjualan (Bar Chart):
+   - Implementasi Bar Chart menggunakan library Recharts.
+   - Sumbu X: Tanggal dalam satu bulan berjalan.
+   - Sumbu Y: Nilai pendapatan.
+   - Fitur Tooltip: Muncul saat bar di-hover untuk menampilkan detail nilai numerik.
+
+4. Monitor Underperforming (Tabel BI):
+   - Tabel khusus yang menampilkan daftar produk yang penjualannya terus menurun (Declining).
+   - Disertai kolom "Saran Tindakan" (misal: "Lakukan diskon 10%" atau "Cek stok kompetitor").
+
+4.4 Pengujian Sistem
+
+4.4.1 Pengujian Blackbox (10+ Skenario)
+Tabel 4.2 Skenario Blackbox Testing
+
+| No | Fungsi | Input | Ekspektasi Hasil | Status |
+| :--- | :--- | :--- | :--- | :--- |
+| 1 | Login (Valid) | Email & Password benar | Masuk ke Dashboard | Berhasil |
+| 2 | Login (Invalid) | Password salah | Muncul pesan "Kredensial salah" | Berhasil |
+| 3 | Login (Empty) | Form kosong | Muncul validasi "Email wajib diisi" | Berhasil |
+| 4 | Input Produk | SKU Duplikat | Pesan error "SKU sudah terdaftar" | Berhasil |
+| 5 | Input Produk | Harga < 0 | Pesan error "Harga tidak boleh minus" | Berhasil |
+| 6 | Filter Laporan | Tanggal Awal > Tanggal Akhir | Pesan error "Range tanggal tidak valid" | Berhasil |
+| 7 | Pagination | Klik halaman 2 | Menampilkan 10 data berikutnya | Berhasil |
+| 8 | Search | Ketik nama produk | Tabel menampilkan baris yang relevan | Berhasil |
+| 9 | Otorisasi | Manager akses menu User | Sistem menolak (Forbidden 403) | Berhasil |
+| 10 | Ekspor Excel | Klik tombol Export | File .xlsx terunduh otomatis | Berhasil |
+
+4.4.2 Pengujian Whitebox (Logika Jalur)
+Pengujian whitebox difokuskan pada unit `TrendRatioCalculator.php` untuk memastikan keakuratan rumus BI.
+
+1. Jalur Test Case 1 (Pertumbuhan):
+   - Input: T1=200jt, T0=100jt.
+   - Logika: 200/100 * 100 = 200%.
+   - Hasil: is_underperforming = FALSE.
+   - Status: Akurat.
+
+2. Jalur Test Case 2 (Penurunan):
+   - Input: T1=50jt, T0=100jt.
+   - Logika: 50/100 * 100 = 50%.
+   - Hasil: is_underperforming = TRUE & count (+1).
+   - Status: Akurat.
+
+3. Jalur Test Case 3 (Data Kosong):
+   - Input: T1=10jt, T0=0jt.
+   - Logika: Menghindari pembagian nol (Division by Zero).
+   - Hasil: Sistem memberikan default rasio 999.99 (infinite growth proxy).
+   - Status: Aman.

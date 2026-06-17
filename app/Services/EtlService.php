@@ -41,9 +41,6 @@ class EtlService
             $recordsProcessed = 0;
 
             switch ($source) {
-                case 'shopee':
-                    $recordsProcessed = $this->extractFromShopee();
-                    break;
                 case 'import':
                     $recordsProcessed = $this->extractFromImport();
                     break;
@@ -61,6 +58,9 @@ class EtlService
 
             Log::info("ETL Process completed. Records processed: {$recordsProcessed}");
 
+            // Generate notification for ETL completion
+            \App\Services\NotificationService::notifyEtlComplete('success', $recordsProcessed);
+
         } catch (\Exception $e) {
             $log->update([
                 'status'        => 'failed',
@@ -69,6 +69,10 @@ class EtlService
             ]);
 
             Log::error("ETL Process failed: " . $e->getMessage());
+
+            // Generate notification for ETL failure
+            \App\Services\NotificationService::notifyEtlComplete('failed', 0, $e->getMessage());
+
             throw $e;
         }
 
@@ -84,21 +88,6 @@ class EtlService
         return $results->count();
     }
 
-    /**
-     * Extract data from Shopee API.
-     * Placeholder — will be fully implemented in Phase 4.
-     */
-    protected function extractFromShopee(): int
-    {
-        // Phase 4: Implement Shopee API extraction
-        // Steps will be:
-        // 1. Call Shopee get_order_list API
-        // 2. For each order, call get_order_detail
-        // 3. Transform JSON to Transaction records
-        // 4. Update product stock levels
-        Log::info('Shopee ETL: Not yet implemented (Phase 4)');
-        return 0;
-    }
 
     /**
      * Extract data from CSV/Excel import files.

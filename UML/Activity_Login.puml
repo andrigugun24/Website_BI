@@ -1,0 +1,24 @@
+@startuml
+skinparam SwimlaneBorderThickness 2
+skinparam ActivityBackgroundColor #DCF2F1
+
+|Pengguna|
+start
+:Mengakses Halaman Login;
+repeat
+  :Memasukkan Email dan Password;
+  :Menekan Tombol "Login";
+  
+  |Sistem|
+  :Melakukan Validasi Kredensial ke Database;
+repeat while (Data Valid?) is (Tidak Valid)
+-> (Valid);
+
+|Sistem|
+:Membangun Sesi (Session) Pengguna;
+:Mengecek Role (Hak Akses);
+:Mengarahkan Halaman Sesuai Role ke Dasbor;
+
+|Pengguna|
+stop
+@enduml

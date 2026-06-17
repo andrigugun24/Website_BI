@@ -1,0 +1,97 @@
+@startuml Sequence_Tambah_Produk
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam sequence {
+  ParticipantBackgroundColor #EBF5FB
+  ParticipantBorderColor #2980B9
+  ArrowColor #2C3E50
+  LifeLineBorderColor #BDC3C7
+  LifeLineBackgroundColor #ECF0F1
+  ActorBackgroundColor #FDEBD0
+  ActorBorderColor #E67E22
+}
+skinparam NoteBackgroundColor #FFFDE7
+skinparam NoteBorderColor #F9A825
+
+title Sequence Diagram — Tambah & Edit Produk
+
+actor "Admin" as Admin
+participant "React Frontend" as FE
+participant "Sanctum Middleware" as Auth
+participant "ProductController" as PC
+participant "Product Model" as PM
+database "Database" as DB
+
+autonumber
+
+== Melihat Daftar Produk ==
+
+Admin -> FE : Akses halaman Produk
+FE -> Auth : GET /api/products\nAuthorization: Bearer {token}
+Auth -> Auth : Validasi token Sanctum
+Auth -> Auth : Cek role (admin|manager)
+
+alt Token tidak valid
+  Auth --> FE : 401 Unauthorized
+  FE --> Admin : Redirect ke Login
+end
+
+Auth -> PC : index(request)
+PC -> DB : SELECT products WITH trendAnalyses\n(latest, limit 1)\nORDER BY name, paginated
+
+DB --> PC : Paginated product list
+PC --> FE : 200 { data: [...], meta: {...} }
+FE --> Admin : Tampilkan tabel produk
+
+== Tambah Produk Baru ==
+
+Admin -> FE : Klik "Tambah Produk"\nIsi form produk
+FE -> Auth : POST /api/products\nAuthorization: Bearer {token}\n{ sku, name, category, price,\n  current_stock, min_stock_threshold,\n  shopee_item_id, image_url }
+
+Auth -> Auth : Cek role: admin only
+
+alt Bukan Admin
+  Auth --> FE : 403 Forbidden
+  FE --> Admin : Tampilkan pesan tidak diizinkan
+end
+
+Auth -> PC : store(request)
+PC -> PC : Validasi:\n- sku: unique di products\n- price: numeric >= 0\n- current_stock: integer >= 0
+
+alt Validasi gagal
+  PC --> FE : 422 { errors }
+  FE --> Admin : Tampilkan error validasi
+end
+
+PC -> DB : INSERT INTO products\n{ sku, name, category, price,\n  current_stock, min_stock_threshold,\n  shopee_item_id, image_url,\n  is_active: true }
+
+DB --> PC : Product record baru
+PC --> FE : 201 Created\n{ message, product }
+
+FE --> Admin : Tutup modal, refresh daftar\nTampilkan notifikasi sukses
+
+== Edit Produk ==
+
+Admin -> FE : Klik "Edit" pada produk
+FE -> Auth : GET /api/products/{id}
+Auth -> PC : show(product)
+PC -> DB : SELECT product WITH trendAnalyses\n(12 terbaru) WITH transactions (5 terbaru)
+DB --> PC : Product detail
+PC --> FE : 200 { product, latest_trend }
+FE --> Admin : Tampilkan form edit
+
+Admin -> FE : Ubah data, klik Simpan
+FE -> Auth : PUT /api/products/{id}\n{ field yang diubah... }
+Auth -> PC : update(request, product)
+PC -> PC : Validasi perubahan\n(sku unique kecuali id ini)
+
+alt Validasi gagal
+  PC --> FE : 422 { errors }
+end
+
+PC -> DB : UPDATE products\nWHERE id = product.id
+DB --> PC : Updated product
+PC --> FE : 200 { message, product }
+FE --> Admin : Refresh data, notifikasi sukses
+
+@enduml

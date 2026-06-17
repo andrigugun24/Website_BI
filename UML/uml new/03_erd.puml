@@ -1,0 +1,181 @@
+@startuml ERD
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam entity {
+  BackgroundColor #EBF5FB
+  BorderColor #2980B9
+}
+skinparam linetype ortho
+
+title Entity Relationship Diagram (ERD) — Sistem BI Tataruma
+
+' ══════════════════════════════════════════════════════════════════════════
+' ENTITIES
+' ══════════════════════════════════════════════════════════════════════════
+
+entity "roles" as roles {
+  *id : BIGINT(PK, AI)
+  --
+  *name : VARCHAR(100)
+  *slug : VARCHAR(50) [UNIQUE]
+  permissions : JSON
+  created_at : TIMESTAMP
+  updated_at : TIMESTAMP
+}
+
+entity "users" as users {
+  *id : BIGINT(PK, AI)
+  --
+  *name : VARCHAR(255)
+  *email : VARCHAR(255) [UNIQUE]
+  *password : VARCHAR(255)
+  *role_id : BIGINT(FK → roles.id)
+  *is_active : TINYINT(1) [DEFAULT 1]
+  remember_token : VARCHAR(100)
+  email_verified_at : TIMESTAMP
+  created_at : TIMESTAMP
+  updated_at : TIMESTAMP
+}
+
+entity "products" as products {
+  *id : BIGINT(PK, AI)
+  --
+  *sku : VARCHAR(50) [UNIQUE]
+  *name : VARCHAR(255)
+  category : VARCHAR(100)
+  *price : DECIMAL(10,2)
+  *current_stock : INT [DEFAULT 0]
+  min_stock_threshold : INT [DEFAULT 0]
+  shopee_item_id : VARCHAR(100)
+  image_url : VARCHAR(255)
+  *is_active : TINYINT(1) [DEFAULT 1]
+  created_at : TIMESTAMP
+  updated_at : TIMESTAMP
+}
+
+entity "transactions" as transactions {
+  *id : BIGINT(PK, AI)
+  --
+  *product_id : BIGINT(FK → products.id)
+  *user_id : BIGINT(FK → users.id)
+  *transaction_date : DATE
+  *quantity_sold : INT
+  *unit_price : DECIMAL(10,2)
+  *total_amount : DECIMAL(10,2)
+  *source : VARCHAR(50) [manual|shopee|import]
+  order_ref : VARCHAR(100)
+  created_at : TIMESTAMP
+  updated_at : TIMESTAMP
+}
+
+entity "trend_analyses" as trend_analyses {
+  *id : BIGINT(PK, AI)
+  --
+  *product_id : BIGINT(FK → products.id)
+  *period_start : DATE
+  *period_end : DATE
+  *base_period_start : DATE
+  *base_period_end : DATE
+  *current_value : DECIMAL(12,2)
+  *base_value : DECIMAL(12,2)
+  *trend_ratio : DECIMAL(8,4)
+  *is_underperforming : TINYINT(1) [DEFAULT 0]
+  *consecutive_decline : INT [DEFAULT 0]
+  created_at : TIMESTAMP
+  updated_at : TIMESTAMP
+}
+
+entity "activity_logs" as activity_logs {
+  *id : BIGINT(PK, AI)
+  --
+  *user_id : BIGINT(FK → users.id)
+  *action : VARCHAR(100)
+  *resource : VARCHAR(100)
+  details : JSON
+  created_at : TIMESTAMP
+  updated_at : TIMESTAMP
+}
+
+entity "notifications" as notifications {
+  *id : BIGINT(PK, AI)
+  --
+  *type : VARCHAR(100)
+  *message : TEXT
+  *is_read : TINYINT(1) [DEFAULT 0]
+  metadata : JSON
+  created_at : TIMESTAMP
+  updated_at : TIMESTAMP
+}
+
+entity "settings" as settings {
+  *id : BIGINT(PK, AI)
+  --
+  *key : VARCHAR(100) [UNIQUE]
+  *value : TEXT
+  created_at : TIMESTAMP
+  updated_at : TIMESTAMP
+}
+
+entity "etl_logs" as etl_logs {
+  *id : BIGINT(PK, AI)
+  --
+  *status : VARCHAR(50) [pending|running|success|failed]
+  records_processed : INT [DEFAULT 0]
+  started_at : TIMESTAMP
+  finished_at : TIMESTAMP
+  message : TEXT
+  created_at : TIMESTAMP
+  updated_at : TIMESTAMP
+}
+
+entity "personal_access_tokens" as personal_access_tokens {
+  *id : BIGINT(PK, AI)
+  --
+  *tokenable_type : VARCHAR(255)
+  *tokenable_id : BIGINT
+  *name : VARCHAR(255)
+  *token : VARCHAR(64) [UNIQUE]
+  abilities : TEXT
+  last_used_at : TIMESTAMP
+  expires_at : TIMESTAMP
+  created_at : TIMESTAMP
+  updated_at : TIMESTAMP
+}
+
+entity "password_reset_tokens" as password_reset_tokens {
+  *email : VARCHAR(255) [PK]
+  --
+  *token : VARCHAR(255)
+  created_at : TIMESTAMP
+}
+
+entity "cache" as cache {
+  *key : VARCHAR(255) [PK]
+  --
+  *value : MEDIUMTEXT
+  *expiration : INT
+}
+
+' ══════════════════════════════════════════════════════════════════════════
+' RELATIONSHIPS
+' ══════════════════════════════════════════════════════════════════════════
+
+' roles → users (one-to-many)
+roles ||--o{ users : "1 role memiliki\nbanyak user"
+
+' users → transactions (one-to-many)
+users ||--o{ transactions : "1 user mencatat\nbanyak transaksi"
+
+' products → transactions (one-to-many)
+products ||--o{ transactions : "1 produk memiliki\nbanyak transaksi"
+
+' products → trend_analyses (one-to-many)
+products ||--o{ trend_analyses : "1 produk memiliki\nbanyak analisis tren"
+
+' users → activity_logs (one-to-many)
+users ||--o{ activity_logs : "1 user memiliki\nbanyak log aktivitas"
+
+' users → personal_access_tokens (polymorphic one-to-many)
+users ||--o{ personal_access_tokens : "1 user memiliki\nbanyak token"
+
+@enduml

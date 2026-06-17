@@ -1,0 +1,55 @@
+@startuml
+top to bottom direction
+skinparam packageStyle rectangle
+
+actor "Admin" as admin
+actor "Manajer" as manajer
+actor "Owner" as owner
+
+rectangle "Sistem Tataruma BI" {
+    
+    usecase "Melakukan Login" as UC_Login
+    usecase "Melakukan Logout" as UC_Logout
+    
+    usecase "Mengelola Master Data" as UC_Master
+    usecase "Mengelola Data User" as UC_User
+    usecase "Mengelola Data Produk" as UC_Produk
+    usecase "Mengelola Data Transaksi" as UC_Transaksi
+    
+    usecase "Menjalankan Otomatisasi ETL & Tren" as UC_ETL
+    usecase "Melihat Laporan Detail" as UC_Laporan
+    
+    usecase "Melihat Dashboard BI" as UC_Dashboard
+    usecase "Menganalisis\nProduk Underperforming" as UC_Analisis
+    
+    usecase "Melihat Ringkasan Eksekutif" as UC_Ringkasan
+
+    UC_Master .up.> UC_Login : <<include>>
+    UC_ETL .up.> UC_Login : <<include>>
+    UC_Laporan .up.> UC_Login : <<include>>
+    UC_Dashboard .up.> UC_Login : <<include>>
+    UC_Analisis .up.> UC_Login : <<include>>
+    UC_Ringkasan .up.> UC_Login : <<include>>
+
+    UC_User .up.> UC_Master : <<extend>>
+    UC_Produk .up.> UC_Master : <<extend>>
+    UC_Transaksi .up.> UC_Master : <<extend>>
+    
+    UC_Ringkasan -[hidden]down-> UC_Logout
+}
+
+admin -right-> UC_Login
+admin -right-> UC_Master
+admin -right-> UC_ETL
+admin -right-> UC_Laporan
+admin -right-> UC_Logout
+
+manajer -left-> UC_Login
+manajer -left-> UC_Dashboard
+manajer -left-> UC_Analisis
+manajer -left-> UC_Logout
+
+owner -left-> UC_Login
+owner -left-> UC_Ringkasan
+owner -left-> UC_Logout
+@enduml

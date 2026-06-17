@@ -1,0 +1,115 @@
+@startuml Sequence_Kalkulasi_Tren
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam sequence {
+  ParticipantBackgroundColor #EBF5FB
+  ParticipantBorderColor #2980B9
+  ArrowColor #2C3E50
+  LifeLineBorderColor #BDC3C7
+  LifeLineBackgroundColor #ECF0F1
+  ActorBackgroundColor #FDEBD0
+  ActorBorderColor #E67E22
+}
+skinparam NoteBackgroundColor #FFFDE7
+skinparam NoteBorderColor #F9A825
+
+title Sequence Diagram — Kalkulasi Rasio Tren & Deteksi Underperforming
+
+actor "Admin" as Admin
+participant "React Frontend" as FE
+participant "Sanctum Middleware" as Auth
+participant "AnalyticsController" as AC
+participant "TrendRatioCalculator" as TRC
+participant "UnderperformingDetector" as UD
+database "Database" as DB
+
+autonumber
+
+== Hitung Rasio Tren ==
+
+Admin -> FE : Akses halaman Analitik\nKlik "Hitung Tren"
+FE -> FE : Tampilkan form pilihan:\n- Tipe: monthly/weekly/custom\n- (jika custom) set tanggal
+
+Admin -> FE : Pilih tipe "monthly"\nlalu klik Hitung
+
+FE -> Auth : POST /api/analytics/calculate\nAuthorization: Bearer {token}\n{ period_type: "monthly" }
+
+Auth -> Auth : Validasi token\nCek role: admin only
+
+alt Bukan Admin
+  Auth --> FE : 403 Forbidden
+  FE --> Admin : Tampilkan pesan tidak diizinkan
+end
+
+Auth -> AC : calculate(request)
+AC -> TRC : calculateMonthly()
+
+TRC -> DB : SELECT * FROM products\nWHERE is_active = true
+
+loop Untuk setiap produk aktif
+  TRC -> DB : SELECT SUM(total_amount)\nFROM transactions\nWHERE product_id = ? AND\ntransaction_date BETWEEN\n[current_period_start, current_period_end]
+  DB --> TRC : current_value
+
+  TRC -> DB : SELECT SUM(total_amount)\nFROM transactions\nWHERE product_id = ? AND\ntransaction_date BETWEEN\n[base_period_start, base_period_end]
+  DB --> TRC : base_value
+
+  TRC -> TRC : Hitung trend_ratio =\ncurrent_value / base_value
+  note right: Jika base = 0 dan current > 0\nratio = 999.99 (new product)\nJika keduanya 0 → ratio = 0
+
+  TRC -> TRC : is_underperforming =\n(trend_ratio < threshold) AND\n(consecutive_decline >= min_decline)
+
+  TRC -> DB : INSERT/UPDATE trend_analyses\n{ product_id, period_start, period_end,\n  base_period_start, base_period_end,\n  current_value, base_value,\n  trend_ratio, is_underperforming,\n  consecutive_decline }
+end
+
+TRC --> AC : Collection<TrendAnalysis> results
+
+AC --> FE : 200 {\n  message: "Perhitungan selesai",\n  products_analyzed: N,\n  underperforming: M,\n  avg_ratio: X.XX\n}
+
+FE --> Admin : Tampilkan ringkasan hasil kalkulasi
+
+== Lihat Produk Underperforming ==
+
+Admin -> FE : Klik tab "Underperforming"
+FE -> Auth : GET /api/analytics/underperforming
+Auth -> AC : underperforming(request)
+AC -> UD : detect()
+
+UD -> DB : SELECT p.*, ta.*\nFROM products p\nJOIN trend_analyses ta ON ta.product_id = p.id\nWHERE ta.is_underperforming = true\nAND ta.id = (SELECT MAX(id) FROM\ntrend_analyses WHERE product_id = p.id)
+
+DB --> UD : Underperforming products
+
+UD -> UD : Klasifikasi severity:\n- HIGH: consecutive_decline >= 3\n- MEDIUM: consecutive_decline = 2\n- LOW: consecutive_decline = 1
+
+UD -> UD : Generate rekomendasi per produk
+UD --> AC : Collection<UnderperformingProduct>
+
+AC -> UD : getSummary()
+UD --> AC : { total, high, medium, low }
+
+AC -> AC : Cek role pengguna
+
+alt Role: Owner
+  AC --> FE : 200 { summary,\n  products: [{ name, severity, ratio }] }
+  note right: Owner hanya\nmendapat ringkasan
+else Role: Admin/Manager
+  AC --> FE : 200 { summary,\n  products: [detail lengkap\n  + rekomendasi] }
+end
+
+FE --> Admin : Tampilkan daftar & visualisasi\nproduk underperforming
+
+== Lihat Heatmap ==
+
+Admin -> FE : Klik "Heatmap"\nSet: start_date, end_date, group_by=month
+FE -> Auth : GET /api/analytics/heatmap\n?start_date=2025-01-01\n&end_date=2025-12-31\n&group_by=month
+
+Auth -> AC : heatmap(request)
+
+AC -> DB : SELECT p.id, p.name, p.category,\n  DATE_FORMAT(t.transaction_date,'%Y-%m') as period,\n  SUM(t.quantity_sold) as qty_sold,\n  SUM(t.total_amount) as revenue\nFROM transactions t\nJOIN products p ON t.product_id = p.id\nWHERE t.transaction_date BETWEEN ? AND ?\nGROUP BY p.id, p.name, p.category, period\nORDER BY p.name, period
+
+DB --> AC : Heatmap matrix data
+
+AC --> FE : 200 [ { product_id, product_name,\n  category, period, qty_sold, revenue }, ...]
+
+FE --> Admin : Render heatmap visualization
+
+@enduml

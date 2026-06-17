@@ -12,12 +12,19 @@ export default function Dashboard() {
     useEffect(() => {
         const fetchDashboard = async () => {
             try {
-                const [result, compResult] = await Promise.all([
-                    api.getDashboard(),
-                    api.getPeriodComparison()
-                ]);
-                setData(result);
-                setComparisonData(compResult);
+                const isOwner = user?.role === 'owner';
+                if (isOwner) {
+                    const result = await api.getDashboard();
+                    setData(result);
+                    setComparisonData(null);
+                } else {
+                    const [result, compResult] = await Promise.all([
+                        api.getDashboard(),
+                        api.getPeriodComparison()
+                    ]);
+                    setData(result);
+                    setComparisonData(compResult);
+                }
             } catch (e) {
                 console.error("Dashboard fetch error", e);
             } finally {
@@ -27,9 +34,58 @@ export default function Dashboard() {
         fetchDashboard();
     }, []);
 
+    const Shimmer = ({ className = '' }) => (
+        <div className={`animate-shimmer rounded ${className}`} />
+    );
+
     if (loading) return (
-        <div className="flex-1 flex items-center justify-center min-h-[50vh]">
-            <div className="w-12 h-12 border-4 border-surface border-t-primary rounded-full animate-spin"></div>
+        <div className="p-8 lg:p-10 max-w-7xl mx-auto w-full flex flex-col gap-8 pb-24">
+            {/* Header skeleton */}
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+                <div>
+                    <Shimmer className="h-8 w-64 mb-2" />
+                    <Shimmer className="h-4 w-80" />
+                </div>
+                <Shimmer className="h-10 w-28 rounded-lg" />
+            </div>
+
+            {/* KPI Cards skeleton */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {[...Array(4)].map((_, i) => (
+                    <div key={i} className="bg-white p-6 rounded-xl shadow-sm border border-accent/10">
+                        <Shimmer className="h-3 w-28 mb-3" />
+                        <Shimmer className="h-9 w-36 mb-4" />
+                        <Shimmer className="h-5 w-24 rounded-full" />
+                    </div>
+                ))}
+            </div>
+
+            {/* AI Summary skeleton */}
+            <Shimmer className="h-40 w-full rounded-2xl" />
+
+            {/* Charts skeleton */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <div className="col-span-12 lg:col-span-8 bg-white rounded-xl p-6 shadow-sm border border-accent/10">
+                    <Shimmer className="h-5 w-48 mb-2" />
+                    <Shimmer className="h-3 w-40 mb-6" />
+                    <div className="flex items-end gap-2 h-64">
+                        {[50,70,40,85,60,45,75,55,65,80,35,90].map((h,i) => (
+                            <div key={i} className="flex-1 flex flex-col justify-end">
+                                <Shimmer style={{height: `${h}%`}} className="rounded-t" />
+                            </div>
+                        ))}
+                    </div>
+                </div>
+                <div className="col-span-12 lg:col-span-4 bg-white rounded-xl p-6 shadow-sm border border-accent/10 flex flex-col items-center">
+                    <Shimmer className="h-5 w-48 mb-6 self-start" />
+                    <Shimmer className="w-40 h-40 rounded-full mb-6" />
+                    <div className="w-full space-y-2">
+                        {[...Array(4)].map((_,i) => (
+                            <div key={i} className="flex justify-between"><Shimmer className="h-3 w-20" /><Shimmer className="h-3 w-16" /></div>
+                        ))}
+                    </div>
+                </div>
+            </div>
         </div>
     );
 

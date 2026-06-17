@@ -1,0 +1,134 @@
+@startuml Activity_Laporan
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam activity {
+  BackgroundColor #EBF5FB
+  BorderColor #2980B9
+  ArrowColor #2C3E50
+  DiamondBackgroundColor #FDEBD0
+  DiamondBorderColor #E67E22
+}
+skinparam StartColor #27AE60
+skinparam EndColor #E74C3C
+
+title Activity Diagram — Pembuatan & Ekspor Laporan
+
+|#EBF5FB| Pengguna |
+|#FEF9E7| Sistem |
+|#F9EBEA| Database |
+
+start
+
+|Pengguna|
+:Akses Menu Laporan;
+
+|Sistem|
+:Verifikasi autentikasi\n& hak akses;
+
+if (Terautentikasi?) then (tidak)
+  :Return 401;
+  stop
+else (ya)
+  
+  |Pengguna|
+  :Pilih jenis laporan;
+  
+  fork
+    ' ── Pratinjau Laporan ──────────────────────────────────────────
+    -> Pratinjau Laporan;
+    
+    |Pengguna|
+    :Set parameter\n(tanggal, produk, dll.);
+    
+    |Database|
+    :Query data penjualan\nsesuai parameter;
+    
+    |Sistem|
+    :Format data laporan\n(tabel/ringkasan);
+    :Tampilkan pratinjau;
+    
+    |Pengguna|
+    :Review laporan;
+
+  fork again
+    ' ── Export CSV ─────────────────────────────────────────────────
+    -> Export CSV;
+    
+    |Sistem|
+    :Cek role\n(Admin/Manager only);
+    
+    if (Admin atau Manager?) then (tidak)
+      :Return 403 Forbidden;
+    else (ya)
+      |Pengguna|
+      :Set periode & filter;
+      
+      |Database|
+      :Query semua data\nsesuai filter;
+      
+      |Sistem|
+      :Generate file CSV\ndengan header;
+      :Set Content-Disposition\n= attachment;
+      :Return response stream;
+      
+      |Pengguna|
+      :Download file CSV;
+    endif
+
+  fork again
+    ' ── Export PDF ─────────────────────────────────────────────────
+    -> Export PDF;
+    
+    |Pengguna|
+    :Set periode laporan;
+    
+    |Database|
+    :Query data laporan;
+    
+    |Sistem|
+    :Render template PDF;
+    
+    if (Role Owner?) then (ya)
+      |Sistem|
+      :Tampilkan hanya\nringkasan eksekutif;
+    else (Admin/Manager)
+      |Sistem|
+      :Tampilkan detail\nlengkap dengan grafik;
+    endif
+    
+    :Generate file PDF;
+    :Return response PDF;
+    
+    |Pengguna|
+    :Buka/Download PDF;
+
+  fork again
+    ' ── Laporan Tren ───────────────────────────────────────────────
+    -> Laporan Tren;
+    
+    |Sistem|
+    :Cek role (Admin/Manager);
+    
+    if (Admin atau Manager?) then (tidak)
+      :Return 403 Forbidden;
+    else (ya)
+      |Pengguna|
+      :Set parameter analisis tren;
+      
+      |Database|
+      :Query trend_analyses\ndengan relasi produk;
+      
+      |Sistem|
+      :Format laporan tren\n(rasio, severity, dll.);
+      :Tampilkan laporan;
+    endif
+
+  end fork
+  
+  |Pengguna|
+  :Selesai;
+endif
+
+stop
+
+@enduml

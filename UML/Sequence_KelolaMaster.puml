@@ -1,0 +1,29 @@
+@startuml
+skinparam maxMessageSize 150
+skinparam ParticipantPadding 20
+
+actor Admin
+boundary "Halaman Form Data\n(View)" as View
+control "MasterController\n(Controller)" as Controller
+entity "Data Entitas\n(Model)" as Model
+database "MySQL\n(Database)" as DB
+
+Admin -> View ++ : Mengisi Form Inputan & Klik Simpan
+View -> Controller ++ : POST Payload Data Baru
+
+Controller -> Controller : Menjalankan Validasi Input\n(Rules Checking)
+
+alt Jika Inputan Lolos Validasi
+    Controller -> Model ++ : Request save() data
+    Model -> DB ++ : Query: INSERT INTO table_name
+    DB --> Model -- : Return ID Data Baru Hasi Insert
+    Model --> Controller -- : Return Objek Data Lurus
+    
+    Controller --> View : Redirect dengan Flash Msg "Sukses"
+    View --> Admin : Menampilkan Tabel Data Baru Terupdate
+else Jika Inputan Gagal Validasi
+    Controller --> View : Redirect Back & Kirim Data Validasi
+    View --> Admin -- : Menampilkan Teks Merah/Error di Form
+end
+deactivate Controller
+@enduml

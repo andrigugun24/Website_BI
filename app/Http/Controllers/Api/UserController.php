@@ -40,6 +40,10 @@ class UserController extends Controller
 
         $user = User::create($validated);
 
+        // Generate notification for new user
+        $roleName = Role::find($validated['role_id'])->name ?? 'Unknown';
+        \App\Services\NotificationService::notifyNewUser($user->name, $roleName);
+
         return response()->json([
             'message' => 'Pengguna berhasil ditambahkan.',
             'user' => $user->load('role'),

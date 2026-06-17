@@ -46,6 +46,9 @@ class TrendRatioCalculator
             }
 
             DB::commit();
+
+            // Generate notifications for underperforming products
+            \App\Services\NotificationService::checkUnderperforming($results->all());
         } catch (\Exception $e) {
             DB::rollBack();
             throw $e;

@@ -1,6 +1,6 @@
 import { NavLink, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import { LayoutDashboard, TrendingUp, Package, FileText, Database, Settings, LogOut, Users, CreditCard, ChevronDown, ChevronRight, Bell, User, Building2, Shield, ListOrdered } from 'lucide-react';
+import { LayoutDashboard, TrendingUp, Package, FileText, Database, Settings, LogOut, Users, CreditCard, ChevronDown, ChevronRight, Bell, User, Building2, Shield, ListOrdered, Menu, X, ClipboardList } from 'lucide-react';
 import { api } from '../services/api';
 
 const NavItem = ({ to, icon: Icon, label, disabled = false }) => {
@@ -94,6 +94,7 @@ export default function Layout({ children }) {
 
     const [notifications, setNotifications] = useState([]);
     const [showNotifications, setShowNotifications] = useState(false);
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const unreadCount = Array.isArray(notifications) ? notifications.filter(n => !n.is_read).length : 0;
 
     useEffect(() => {
@@ -142,13 +143,14 @@ export default function Layout({ children }) {
             {/* Sidebar Desktop */}
             <aside className="fixed left-0 top-0 h-screen w-72 bg-surface flex-col p-6 gap-y-2 hidden md:flex z-50 shadow-sm border-r border-accent/10">
                 <div className="flex items-center gap-3 mb-8 px-2">
-                    <img src="/logo.png" alt="Tataruma Logo" className="h-10 object-contain" />
+                    <span className="font-sans font-extrabold text-[#708F7F] text-[28px] tracking-tighter lowercase drop-shadow-sm">tataruma</span>
                 </div>
 
                 <nav className="flex-1 flex flex-col gap-1 overflow-y-auto pr-1 pb-4">
                     <NavItem to="/" icon={LayoutDashboard} label="Dashboard Utama" />
                     <NavItem to="/trend" icon={TrendingUp} label="Analisis Tren" />
                     <NavItem to="/products" icon={Package} label="Produk" />
+                    <NavItem to="/stock-requests" icon={ClipboardList} label="Permintaan Stok" />
                     <NavItem to="/transactions" icon={CreditCard} label="Transaksi" />
                     <NavItem to="/reports" icon={FileText} label="Pelaporan" />
                     {user?.role === 'admin' && (
@@ -175,9 +177,9 @@ export default function Layout({ children }) {
             {/* Main Content Area */}
             <main className="md:ml-72 flex flex-col min-h-screen w-full">
                 {/* TopAppBar */}
-                <header className="bg-brand-bg flex justify-between items-center w-full px-10 py-4 h-20 sticky top-0 z-40 border-b border-accent/10 md:border-none backdrop-blur-md bg-opacity-80">
+                <header className="bg-brand-bg flex justify-between items-center w-full px-6 md:px-10 py-4 h-20 sticky top-0 z-40 border-b border-accent/10 md:border-none backdrop-blur-md bg-opacity-80">
                     <div className="flex items-center gap-4">
-                        <h1 className="text-2xl font-bold tracking-tight text-primary font-headline md:hidden">Tataruma BI</h1>
+                        <span className="font-sans font-extrabold text-[#708F7F] text-[28px] tracking-tighter lowercase drop-shadow-sm md:hidden">tataruma</span>
                         <div className="hidden lg:flex items-center gap-6 h-full">
                             <span className="text-on-surface font-semibold text-lg">{user?.role_name || 'Panel'}</span>
                         </div>
@@ -269,11 +271,43 @@ export default function Layout({ children }) {
                         <FileText size={20} />
                         <span className="text-[10px] font-bold">Laporan</span>
                     </NavLink>
-                    <button onClick={handleLogout} className="flex flex-col items-center gap-1 text-on-surface ml-2">
-                        <LogOut size={20} className="text-secondary" />
-                        <span className="text-[10px] font-bold">Keluar</span>
+                    <button onClick={() => setIsMobileMenuOpen(true)} className="flex flex-col items-center gap-1 text-on-surface ml-2">
+                        <Menu size={20} className="text-secondary" />
+                        <span className="text-[10px] font-bold">Menu</span>
                     </button>
                 </nav>
+
+                {/* Mobile Menu Overlay */}
+                {isMobileMenuOpen && (
+                    <div className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm md:hidden flex justify-end" onClick={() => setIsMobileMenuOpen(false)}>
+                        <div className="w-72 bg-surface h-full flex flex-col p-6 shadow-xl transition-transform transform translate-x-0" onClick={e => e.stopPropagation()}>
+                            <div className="flex justify-between items-center mb-8">
+                                <span className="font-sans font-extrabold text-[#708F7F] text-[28px] tracking-tighter lowercase drop-shadow-sm">tataruma</span>
+                                <button onClick={() => setIsMobileMenuOpen(false)} className="text-accent hover:text-primary"><X size={24}/></button>
+                            </div>
+                            <div className="flex-1 overflow-y-auto flex flex-col gap-2">
+                                <NavItem to="/stock-requests" icon={ClipboardList} label="Permintaan Stok" />
+                                <NavItem to="/transactions" icon={CreditCard} label="Transaksi" />
+                                {user?.role === 'admin' && (
+                                    <>
+                                        <NavItem to="/users" icon={Users} label="Manajemen Pengguna" />
+                                        <NavItem to="/data" icon={Database} label="Manajemen Data" />
+                                    </>
+                                )}
+                                <NavDropdown user={user} />
+                            </div>
+                            <div className="mt-auto pt-4 border-t border-accent/20">
+                                <button 
+                                    onClick={handleLogout}
+                                    className="w-full bg-white text-on-surface border border-accent/20 py-2.5 rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-surface active:scale-95 transition-all"
+                                >
+                                    <LogOut size={16} className="text-secondary" />
+                                    <span className="text-sm">Keluar</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </main>
         </div>
     );

@@ -1,0 +1,134 @@
+@startuml Activity_ETL_DataManagement
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam activity {
+  BackgroundColor #EBF5FB
+  BorderColor #2980B9
+  ArrowColor #2C3E50
+  DiamondBackgroundColor #FDEBD0
+  DiamondBorderColor #E67E22
+}
+skinparam StartColor #27AE60
+skinparam EndColor #E74C3C
+
+title Activity Diagram — ETL & Manajemen Data
+
+|#EBF5FB| Admin |
+|#FEF9E7| Sistem |
+|#F9EBEA| Database |
+|#EAFAF1| ETL Engine |
+
+start
+
+|Admin|
+:Akses Menu Data Management;
+
+|Sistem|
+:Verifikasi role Admin;
+
+if (Admin?) then (tidak)
+  :Return 403 Forbidden;
+  stop
+else (ya)
+  |Admin|
+  :Pilih aksi;
+
+  fork
+    ' ── Jalankan ETL ───────────────────────────────────────────────
+    -> Jalankan ETL;
+    
+    |ETL Engine|
+    :Buat record etl_log\n(status: running,\nstarted_at: now);
+    
+    :Ambil data sumber\n(Shopee API / file);
+    
+    if (Sumber tersedia?) then (tidak)
+      |Database|
+      :UPDATE etl_log\nstatus = failed;
+      
+      |Sistem|
+      :Return error message;
+    else (ya)
+      |ETL Engine|
+      :Extract:\nParsing data sumber;
+      
+      :Transform:\n- Normalisasi format\n- Validasi data\n- Mapping field;
+      
+      if (Data valid?) then (tidak)
+        |Database|
+        :Log error records;
+        :UPDATE etl_log\nstatus = failed;
+        
+        |Sistem|
+        :Return error details;
+      else (ya)
+        :Load:\nINSERT/UPDATE transactions;
+        :UPDATE product stocks;
+        
+        |Database|
+        :UPDATE etl_log\nstatus = success\nrecords_processed = N\nfinished_at = now;
+        
+        |Sistem|
+        :Return hasil ETL\n(records processed);
+        
+        |Admin|
+        :Lihat laporan ETL;
+      endif
+    endif
+
+  fork again
+    ' ── Lihat Log ETL ──────────────────────────────────────────────
+    -> Lihat Log ETL;
+    
+    |Database|
+    :Query etl_logs\nORDER BY created_at DESC;
+    
+    |Sistem|
+    :Tampilkan riwayat ETL\n(status, waktu, records);
+    
+    |Admin|
+    :Review log ETL;
+
+  fork again
+    ' ── Import Data ────────────────────────────────────────────────
+    -> Import Data Manual;
+    
+    |Admin|
+    :Upload file\n(CSV/Excel);
+    
+    |Sistem|
+    :Validasi format file;
+    
+    if (Format valid?) then (tidak)
+      :Tampilkan error format;
+    else (ya)
+      |Sistem|
+      :Parse file;
+      :Validasi setiap baris data;
+      
+      if (Semua data valid?) then (tidak)
+        :Tampilkan baris bermasalah;
+        
+        |Admin|
+        :Perbaiki file;
+      else (ya)
+        |Database|
+        :Batch INSERT transactions\natau products;
+        
+        |Sistem|
+        :Return hasil import\n(total records inserted);
+        
+        |Admin|
+        :Lihat laporan import;
+      endif
+    endif
+
+  end fork
+
+  |Admin|
+  :Selesai;
+endif
+
+stop
+
+@enduml

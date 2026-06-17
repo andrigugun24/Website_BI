@@ -1,0 +1,152 @@
+@startuml Activity_Manajemen_Pengguna
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam activity {
+  BackgroundColor #EBF5FB
+  BorderColor #2980B9
+  ArrowColor #2C3E50
+  DiamondBackgroundColor #FDEBD0
+  DiamondBorderColor #E67E22
+}
+skinparam StartColor #27AE60
+skinparam EndColor #E74C3C
+
+title Activity Diagram — Manajemen Pengguna
+
+|#EBF5FB| Admin |
+|#FEF9E7| Sistem |
+|#F9EBEA| Database |
+|#EAFAF1| NotificationService |
+
+start
+
+|Admin|
+:Akses Menu Pengguna;
+
+|Sistem|
+:Verifikasi role Admin;
+
+if (Admin?) then (tidak)
+  :Return 403 Forbidden;
+  stop
+else (ya)
+  |Database|
+  :Load semua pengguna\n(dengan relasi role);
+  
+  |Sistem|
+  :Tampilkan daftar pengguna;
+  
+  |Admin|
+  :Pilih aksi;
+
+  fork
+    ' ── Tambah Pengguna ────────────────────────────────────────────
+    -> Tambah Pengguna;
+    :Isi form pengguna\n(nama, email, password,\nrole_id, is_active);
+    
+    |Sistem|
+    :Validasi input\n(email unique, password >= 8);
+    
+    if (Valid?) then (tidak)
+      :Tampilkan error;
+      |Admin|
+      :Perbaiki form;
+    else (ya)
+      |Sistem|
+      :Hash password;
+      
+      |Database|
+      :INSERT users;
+      :Get role name;
+      
+      |NotificationService|
+      :notifyNewUser(\nnama, role_name);
+      
+      |Database|
+      :INSERT notifications;
+      
+      |Sistem|
+      :Return user baru (201);
+      
+      |Admin|
+      :Lihat notifikasi sukses;
+    endif
+
+  fork again
+    ' ── Edit Pengguna ──────────────────────────────────────────────
+    -> Edit Pengguna;
+    :Pilih pengguna;
+    :Ubah data\n(nama/email/password/role\n/status aktif);
+    
+    |Sistem|
+    :Validasi perubahan\n(email unique kecuali diri sendiri);
+    
+    if (Valid?) then (tidak)
+      :Tampilkan error;
+    else (ya)
+      if (Password diubah?) then (ya)
+        |Sistem|
+        :Hash password baru;
+      endif
+      
+      |Database|
+      :UPDATE users\nWHERE id = user_id;
+      
+      |Sistem|
+      :Return user terbaru;
+      
+      |Admin|
+      :Lihat notifikasi sukses;
+    endif
+
+  fork again
+    ' ── Hapus/Nonaktifkan Pengguna ─────────────────────────────────
+    -> Hapus Pengguna;
+    :Pilih pengguna;
+    
+    |Sistem|
+    :Cek apakah hapus diri sendiri;
+    
+    if (Diri sendiri?) then (ya)
+      :Return 403\n"Tidak dapat hapus diri sendiri";
+    else (tidak)
+      |Database|
+      :Cek riwayat transaksi\npengguna ini;
+      
+      if (Ada transaksi?) then (ya)
+        |Database|
+        :UPDATE users\nSET is_active = false;
+        
+        |Sistem|
+        :Return "Dinonaktifkan\nkarena ada riwayat";
+      else (tidak)
+        |Database|
+        :DELETE FROM users;
+        
+        |Sistem|
+        :Return "Berhasil dihapus";
+      endif
+      
+      |Admin|
+      :Lihat notifikasi;
+    endif
+
+  fork again
+    ' ── Lihat Roles ─────────────────────────────────────────────────
+    -> Lihat Roles;
+    
+    |Database|
+    :Query semua roles;
+    
+    |Sistem|
+    :Tampilkan daftar role\ndengan permissions;
+
+  end fork
+
+  |Admin|
+  :Selesai;
+endif
+
+stop
+
+@enduml

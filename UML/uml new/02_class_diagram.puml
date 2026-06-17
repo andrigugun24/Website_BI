@@ -1,0 +1,278 @@
+@startuml Class_Diagram
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam classBackgroundColor #EBF5FB
+skinparam classBorderColor #2980B9
+skinparam classArrowColor #2C3E50
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+
+title Class Diagram — Sistem Business Intelligence Tataruma
+
+' ══════════════════════════════════════════════════════════════════════════
+' MODELS
+' ══════════════════════════════════════════════════════════════════════════
+
+class Role {
+  +id : int <<PK>>
+  +name : string
+  +slug : string
+  +permissions : array (JSON)
+  +created_at : timestamp
+  +updated_at : timestamp
+  --
+  +users() : HasMany<User>
+  +hasPermission(permission: string) : bool
+  ..Constants..
+  {static} ADMIN = "admin"
+  {static} MANAGER = "manager"
+  {static} OWNER = "owner"
+}
+
+class User {
+  +id : int <<PK>>
+  +name : string
+  +email : string
+  +password : string <<hashed>>
+  +role_id : int <<FK>>
+  +is_active : boolean
+  +remember_token : string
+  +email_verified_at : timestamp
+  +created_at : timestamp
+  +updated_at : timestamp
+  --
+  +role() : BelongsTo<Role>
+  +transactions() : HasMany<Transaction>
+  +isAdmin() : bool
+  +isManager() : bool
+  +isOwner() : bool
+  +hasPermission(permission: string) : bool
+}
+
+class Product {
+  +id : int <<PK>>
+  +sku : string
+  +name : string
+  +category : string
+  +price : decimal(10,2)
+  +current_stock : int
+  +min_stock_threshold : int
+  +shopee_item_id : string
+  +image_url : string
+  +is_active : boolean
+  +created_at : timestamp
+  +updated_at : timestamp
+  --
+  +transactions() : HasMany<Transaction>
+  +trendAnalyses() : HasMany<TrendAnalysis>
+  +scopeActive(query) : Builder
+  +scopeUnderperforming(query) : Builder
+  +scopeLowStock(query) : Builder
+  +getLatestTrendAttribute() : TrendAnalysis
+}
+
+class Transaction {
+  +id : int <<PK>>
+  +product_id : int <<FK>>
+  +user_id : int <<FK>>
+  +transaction_date : date
+  +quantity_sold : int
+  +unit_price : decimal(10,2)
+  +total_amount : decimal(10,2)
+  +source : string
+  +order_ref : string
+  +created_at : timestamp
+  +updated_at : timestamp
+  --
+  +product() : BelongsTo<Product>
+  +user() : BelongsTo<User>
+  +scopeInPeriod(query, start, end) : Builder
+  +scopeBySource(query, source) : Builder
+  +scopeByProduct(query, productId) : Builder
+}
+
+class TrendAnalysis {
+  +id : int <<PK>>
+  +product_id : int <<FK>>
+  +period_start : date
+  +period_end : date
+  +base_period_start : date
+  +base_period_end : date
+  +current_value : decimal(10,2)
+  +base_value : decimal(10,2)
+  +trend_ratio : decimal(5,2)
+  +is_underperforming : boolean
+  +consecutive_decline : int
+  +created_at : timestamp
+  +updated_at : timestamp
+  --
+  +product() : BelongsTo<Product>
+  +scopeUnderperforming(query) : Builder
+  +scopeLatestPerProduct(query) : Builder
+}
+
+class ActivityLog {
+  +id : int <<PK>>
+  +user_id : int <<FK>>
+  +action : string
+  +resource : string
+  +details : JSON
+  +created_at : timestamp
+  +updated_at : timestamp
+}
+
+class Notification {
+  +id : int <<PK>>
+  +type : string
+  +message : string
+  +is_read : boolean
+  +metadata : JSON
+  +created_at : timestamp
+  +updated_at : timestamp
+}
+
+class Setting {
+  +id : int <<PK>>
+  +key : string
+  +value : string
+  +created_at : timestamp
+  +updated_at : timestamp
+}
+
+class EtlLog {
+  +id : int <<PK>>
+  +status : string
+  +records_processed : int
+  +started_at : timestamp
+  +finished_at : timestamp
+  +message : string
+  +created_at : timestamp
+  +updated_at : timestamp
+}
+
+' ══════════════════════════════════════════════════════════════════════════
+' CONTROLLERS
+' ══════════════════════════════════════════════════════════════════════════
+
+class AuthController <<Controller>> {
+  +login(request: Request) : JsonResponse
+  +logout(request: Request) : JsonResponse
+  +logoutAll(request: Request) : JsonResponse
+  +forgotPassword(request: Request) : JsonResponse
+  +resetPassword(request: Request) : JsonResponse
+  +me(request: Request) : JsonResponse
+  +updateProfile(request: Request) : JsonResponse
+  +changePassword(request: Request) : JsonResponse
+}
+
+class ProductController <<Controller>> {
+  +index(request: Request) : JsonResponse
+  +show(product: Product) : JsonResponse
+  +store(request: Request) : JsonResponse
+  +update(request: Request, product: Product) : JsonResponse
+  +destroy(product: Product) : JsonResponse
+  +categories() : JsonResponse
+}
+
+class TransactionController <<Controller>> {
+  +index(request: Request) : JsonResponse
+  +store(request: Request) : JsonResponse
+  +show(transaction: Transaction) : JsonResponse
+  +summary(request: Request) : JsonResponse
+}
+
+class AnalyticsController <<Controller>> {
+  -calculator : TrendRatioCalculator
+  -detector : UnderperformingDetector
+  +trend(request: Request) : JsonResponse
+  +underperforming(request: Request) : JsonResponse
+  +calculate(request: Request) : JsonResponse
+  +heatmap(request: Request) : JsonResponse
+  +periodComparison(request: Request) : JsonResponse
+}
+
+class UserController <<Controller>> {
+  +index(request: Request) : JsonResponse
+  +store(request: Request) : JsonResponse
+  +update(request: Request, user: User) : JsonResponse
+  +destroy(user: User) : JsonResponse
+  +roles() : JsonResponse
+}
+
+class DashboardController <<Controller>> {
+  +index(request: Request) : JsonResponse
+}
+
+class ReportController <<Controller>> {
+  +preview(request: Request) : JsonResponse
+  +exportCsv(request: Request) : Response
+  +exportPdf(request: Request) : Response
+  +trendReport(request: Request) : JsonResponse
+}
+
+class DataManagementController <<Controller>> {
+  +runEtl(request: Request) : JsonResponse
+  +etlLogs(request: Request) : JsonResponse
+  +importData(request: Request) : JsonResponse
+}
+
+class ActivityLogController <<Controller>> {
+  +index(request: Request) : JsonResponse
+  {static} +log(action, resource, details) : void
+}
+
+class SettingController <<Controller>> {
+  +index(request: Request) : JsonResponse
+  +update(request: Request) : JsonResponse
+}
+
+' ══════════════════════════════════════════════════════════════════════════
+' SERVICES
+' ══════════════════════════════════════════════════════════════════════════
+
+class TrendRatioCalculator <<Service>> {
+  +calculateAll(currentStart, currentEnd, baseStart, baseEnd) : Collection
+  +calculateMonthly() : Collection
+  +calculateWeekly() : Collection
+}
+
+class UnderperformingDetector <<Service>> {
+  +detect() : Collection
+  +getSummary() : array
+}
+
+class NotificationService <<Service>> {
+  {static} +checkLowStock(product: Product) : void
+  {static} +notifyNewUser(name: string, role: string) : void
+}
+
+' ══════════════════════════════════════════════════════════════════════════
+' RELATIONSHIPS
+' ══════════════════════════════════════════════════════════════════════════
+
+' Model Relationships
+Role "1" --o{ "n" User : "has many"
+User "1" --o{ "n" Transaction : "records"
+Product "1" --o{ "n" Transaction : "has many"
+Product "1" --o{ "n" TrendAnalysis : "has many"
+
+' Controller → Model usage
+AuthController ..> User : uses
+ProductController ..> Product : manages
+TransactionController ..> Transaction : manages
+AnalyticsController ..> TrendAnalysis : reads
+AnalyticsController ..> Product : reads
+UserController ..> User : manages
+UserController ..> Role : reads
+ActivityLogController ..> ActivityLog : logs
+
+' Service dependencies
+AnalyticsController *-- TrendRatioCalculator : injects
+AnalyticsController *-- UnderperformingDetector : injects
+TransactionController ..> NotificationService : calls
+UserController ..> NotificationService : calls
+TrendRatioCalculator ..> TrendAnalysis : writes
+UnderperformingDetector ..> TrendAnalysis : reads
+UnderperformingDetector ..> Product : reads
+
+@enduml

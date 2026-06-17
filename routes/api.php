@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DataManagementController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\ReportController;
+use App\Http\Controllers\Api\StockRequestController;
 use App\Http\Controllers\Api\TransactionController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\SettingController;
@@ -74,6 +75,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/products/categories', [ProductController::class, 'categories'])
         ->middleware('role:admin,manager');
 
+    Route::get('/products/template/download', [ProductController::class, 'downloadTemplate'])
+        ->middleware('role:admin,manager');
+        
+    Route::post('/products/import', [ProductController::class, 'import'])
+        ->middleware('role:admin');
+
     Route::get('/products/{product}', [ProductController::class, 'show'])
         ->middleware('role:admin,manager');
 
@@ -86,12 +93,27 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/products/{product}', [ProductController::class, 'destroy'])
         ->middleware('role:admin');
 
+    // Stock Requests — Multi-stage workflow
+    Route::get('/stock-requests', [StockRequestController::class, 'index']);
+    Route::post('/stock-requests', [StockRequestController::class, 'store'])
+        ->middleware('role:admin,manager,owner');
+    Route::patch('/stock-requests/{stockRequest}/status', [StockRequestController::class, 'updateStatus'])
+        ->middleware('role:owner');
+    Route::patch('/stock-requests/{stockRequest}/execute', [StockRequestController::class, 'execute'])
+        ->middleware('role:admin');
+
     // Transactions — Admin full, Manager read-only
     Route::get('/transactions', [TransactionController::class, 'index'])
         ->middleware('role:admin,manager');
 
     Route::get('/transactions/summary', [TransactionController::class, 'summary'])
         ->middleware('role:admin,manager');
+
+    Route::get('/transactions/template/download', [TransactionController::class, 'downloadTemplate'])
+        ->middleware('role:admin,manager');
+
+    Route::post('/transactions/import', [TransactionController::class, 'import'])
+        ->middleware('role:admin');
 
     Route::post('/transactions', [TransactionController::class, 'store'])
         ->middleware('role:admin');

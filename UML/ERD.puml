@@ -1,0 +1,64 @@
+@startuml
+skinparam roundcorner 5
+skinparam linetype ortho
+skinparam shadowing false
+skinparam class {
+    BackgroundColor White
+    ArrowColor #2C3E50
+    BorderColor #2C3E50
+}
+hide circle
+
+entity "roles" as roles {
+  * id : BigInt <<PK>>
+  --
+  * name : Varchar(50)
+  * slug : Varchar(50)
+}
+
+entity "users" as users {
+  * id : BigInt <<PK>>
+  --
+  * role_id : BigInt <<FK>>
+  * name : Varchar(255)
+  * email : Varchar(255)
+  * password : Varchar(255)
+  * is_active : Boolean
+}
+
+entity "products" as products {
+  * id : BigInt <<PK>>
+  --
+  * sku : Varchar(50)
+  * name : Varchar(255)
+  category : Varchar(100)
+  * base_price : Decimal(15,2)
+  * status : Enum
+}
+
+entity "transactions" as transactions {
+  * id : BigInt <<PK>>
+  --
+  * product_id : BigInt <<FK>>
+  * user_id : BigInt <<FK>>
+  * transaction_date : Date
+  * quantity_sold : Int
+  * total_amount : Decimal(15,2)
+}
+
+entity "trend_analyses" as trend_analyses {
+  * id : BigInt <<PK>>
+  --
+  * product_id : BigInt <<FK>>
+  * period_start : Date
+  * period_end : Date
+  * trend_ratio : Decimal(5,2)
+  is_underperforming : Boolean
+  consecutive_decline : Int
+}
+
+roles ||--o{ users : "memiliki role"
+users ||--o{ transactions : "menginput"
+products ||--o{ transactions : "direkam pada"
+products ||--o{ trend_analyses : "dianalisa di"
+@enduml

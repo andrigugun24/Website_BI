@@ -1,0 +1,136 @@
+@startuml Activity_Analitik_Tren
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam activity {
+  BackgroundColor #EBF5FB
+  BorderColor #2980B9
+  ArrowColor #2C3E50
+  DiamondBackgroundColor #FDEBD0
+  DiamondBorderColor #E67E22
+}
+skinparam StartColor #27AE60
+skinparam EndColor #E74C3C
+
+title Activity Diagram — Analitik & Kalkulasi Tren
+
+|#EBF5FB| Admin |
+|#FEF9E7| Sistem |
+|#EAFAF1| TrendRatioCalculator |
+|#F9EBEA| Database |
+
+start
+
+|Admin|
+:Akses Menu Analitik;
+
+|Sistem|
+:Verifikasi autentikasi;
+
+|Admin|
+:Pilih jenis analitik;
+
+fork
+  ' ── Hitung Rasio Tren ──────────────────────────────────────────
+  -> Hitung Rasio Tren;
+  
+  |Sistem|
+  :Cek role hanya Admin;
+  
+  if (Admin?) then (tidak)
+    :Return 403 Forbidden;
+  else (ya)
+    |Admin|
+    :Pilih tipe periode\n(monthly/weekly/custom);
+    
+    if (Custom?) then (ya)
+      |Admin|
+      :Input tanggal:\ncurrent_start, current_end\nbase_start, base_end;
+      
+      |TrendRatioCalculator|
+      :calculateAll(\ncurrent_period,\nbase_period);
+    else if (Weekly?) then (ya)
+      |TrendRatioCalculator|
+      :calculateWeekly();
+    else (monthly)
+      |TrendRatioCalculator|
+      :calculateMonthly();
+    endif
+    
+    |Database|
+    :Query SUM(total_amount)\nper produk per periode;
+    
+    |TrendRatioCalculator|
+    :Hitung trend_ratio =\ncurrent / base;
+    :Tandai is_underperforming\njika ratio < threshold;
+    :Update consecutive_decline;
+    
+    |Database|
+    :UPSERT trend_analyses\n(per produk per periode);
+    
+    |Sistem|
+    :Return:\nproducts_analyzed,\nunderperforming count,\navg_ratio;
+    
+    |Admin|
+    :Lihat hasil perhitungan;
+  endif
+
+fork again
+  ' ── Lihat Produk Underperforming ───────────────────────────────
+  -> Lihat Underperforming;
+  
+  |Database|
+  :Query trend_analyses\nWHERE is_underperforming = true\n(latest per product);
+  
+  |Sistem|
+  :Klasifikasi severity\n(low/medium/high);
+  :Generate rekomendasi;
+  
+  if (Role Owner?) then (ya)
+    |Sistem|
+    :Return hanya\nnama, severity, trend_ratio;
+  else (Admin/Manager)
+    |Sistem|
+    :Return detail lengkap\nbeserta rekomendasi;
+  endif
+  
+  |Admin|
+  :Lihat daftar produk underperforming;
+
+fork again
+  ' ── Heatmap ────────────────────────────────────────────────────
+  -> Lihat Heatmap;
+  
+  |Admin|
+  :Set rentang tanggal\n& group_by (week/month);
+  
+  |Database|
+  :Query matrix:\nproduct × period\nSUM(qty, revenue);
+  
+  |Sistem|
+  :Susun data heatmap;
+  :Tampilkan visualisasi;
+
+fork again
+  ' ── Perbandingan Periode ───────────────────────────────────────
+  -> Perbandingan Periode;
+  
+  |Admin|
+  :Input:\ncurrent_start, current_end\nbase_start, base_end;
+  
+  |Database|
+  :Query revenue per produk\nuntuk current period;
+  :Query revenue per produk\nuntuk base period;
+  
+  |Sistem|
+  :Hitung trend_ratio\n= (current / base) × 100;
+  :Urutkan berdasarkan ratio\n(ascending);
+  :Tampilkan column chart;
+
+end fork
+
+|Admin|
+:Selesai;
+
+stop
+
+@enduml

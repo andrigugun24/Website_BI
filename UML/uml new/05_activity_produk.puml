@@ -1,0 +1,134 @@
+@startuml Activity_Manajemen_Produk
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam activity {
+  BackgroundColor #EBF5FB
+  BorderColor #2980B9
+  ArrowColor #2C3E50
+  DiamondBackgroundColor #FDEBD0
+  DiamondBorderColor #E67E22
+}
+skinparam StartColor #27AE60
+skinparam EndColor #E74C3C
+
+title Activity Diagram — Manajemen Produk (CRUD)
+
+|#EBF5FB| Admin |
+|#FEF9E7| Sistem |
+|#F9EBEA| Database |
+
+start
+
+|Admin|
+:Akses Menu Produk;
+
+|Sistem|
+:Cek autentikasi & role;
+
+if (Admin?) then (tidak)
+  :Tampilkan error\n403 Forbidden;
+  stop
+else (ya)
+  |Database|
+  :Query daftar produk\n(dengan filter opsional);
+  
+  |Sistem|
+  :Tampilkan daftar produk\n(paginated);
+  
+  |Admin|
+  :Pilih aksi;
+
+  fork
+    ' ── Tambah Produk ──────────────────────────────────────────────
+    -> Tambah Produk;
+    :Isi form produk baru\n(SKU, nama, kategori,\nharga, stok, threshold);
+    
+    |Sistem|
+    :Validasi input\n(SKU unique, harga >= 0, dll.);
+    
+    if (Valid?) then (tidak)
+      :Tampilkan error validasi;
+      |Admin|
+      :Perbaiki form;
+    else (ya)
+      |Database|
+      :INSERT products;
+      
+      |Sistem|
+      :Return produk baru\n(status 201);
+      
+      |Admin|
+      :Lihat notifikasi sukses;
+    endif
+
+  fork again
+    ' ── Edit Produk ────────────────────────────────────────────────
+    -> Edit Produk;
+    :Pilih produk dari list;
+    
+    |Sistem|
+    :Load data produk saat ini;
+    
+    |Admin|
+    :Ubah data yang diperlukan;
+    
+    |Sistem|
+    :Validasi input perubahan;
+    
+    if (Valid?) then (tidak)
+      :Tampilkan error validasi;
+      |Admin|
+      :Perbaiki form;
+    else (ya)
+      |Database|
+      :UPDATE products\nWHERE id = product_id;
+      
+      |Sistem|
+      :Return produk terbaru;
+      
+      |Admin|
+      :Lihat notifikasi sukses;
+    endif
+
+  fork again
+    ' ── Nonaktifkan Produk ─────────────────────────────────────────
+    -> Nonaktifkan Produk;
+    :Pilih produk;
+    :Konfirmasi penghapusan;
+    
+    |Sistem|
+    :Validasi produk ada;
+    
+    |Database|
+    :UPDATE products\nSET is_active = false;
+    
+    |Sistem|
+    :Return pesan berhasil;
+    
+    |Admin|
+    :Lihat notifikasi sukses;
+    :Produk hilang dari list aktif;
+
+  fork again
+    ' ── Filter / Pencarian ─────────────────────────────────────────
+    -> Filter Produk;
+    :Masukkan keyword\natau pilih kategori;
+    
+    |Sistem|
+    :Build WHERE clause\n(search, category, is_active,\nlow_stock, underperforming);
+    
+    |Database|
+    :Query produk dengan filter;
+    
+    |Sistem|
+    :Tampilkan hasil filter;
+
+  end fork
+
+  |Admin|
+  :Selesai;
+endif
+
+stop
+
+@enduml

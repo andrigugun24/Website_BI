@@ -1,0 +1,78 @@
+@startuml
+skinparam class {
+    BackgroundColor White
+    ArrowColor #2C3E50
+    BorderColor #2C3E50
+}
+hide circle
+
+class Role {
+  - id : BigInt <<PK>>
+  - name : String
+  - slug : String
+  --
+  + getPermissions() : Array
+  + users() : Collection
+}
+
+class User {
+  - id : BigInt <<PK>>
+  - role_id : BigInt <<FK>>
+  - name : String
+  - email : String
+  - password : String
+  - is_active : Boolean
+  --
+  + login() : Boolean
+  + logout() : Void
+  + simpan() : Boolean
+  + update() : Boolean
+  + hapus() : Void
+  + isAdmin() : Boolean
+}
+
+class Product {
+  - id : BigInt <<PK>>
+  - sku : String
+  - name : String
+  - category : String
+  - base_price : Decimal
+  - status : String
+  --
+  + simpan() : Boolean
+  + update() : Boolean
+  + hapus() : Void
+  + calculateTrend() : Float
+}
+
+class Transaction {
+  - id : BigInt <<PK>>
+  - product_id : BigInt <<FK>>
+  - user_id : BigInt <<FK>>
+  - transaction_date : Date
+  - quantity_sold : Integer
+  - total_amount : Decimal
+  --
+  + recordSale() : Boolean
+  + hitungTotal() : Decimal
+}
+
+class TrendAnalysis {
+  - id : BigInt <<PK>>
+  - product_id : BigInt <<FK>>
+  - period_start : Date
+  - period_end : Date
+  - trend_ratio : Decimal
+  - is_underperforming : Boolean
+  - consecutive_decline : Integer
+  --
+  + simpan() : Boolean
+  + generateInsights() : Void
+  + checkDeclineStatus() : Void
+}
+
+Role "1" -- "0..*" User : memiliki >
+User "1" -- "0..*" Transaction : memproses/input >
+Product "1" -- "0..*" Transaction : terjual pada >
+Product "1" -- "0..*" TrendAnalysis : dianalisis di >
+@enduml

@@ -1,0 +1,126 @@
+@startuml Activity_Transaksi
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam activity {
+  BackgroundColor #EBF5FB
+  BorderColor #2980B9
+  ArrowColor #2C3E50
+  DiamondBackgroundColor #FDEBD0
+  DiamondBorderColor #E67E22
+}
+skinparam StartColor #27AE60
+skinparam EndColor #E74C3C
+
+title Activity Diagram — Pencatatan Transaksi Penjualan
+
+|#EBF5FB| Admin |
+|#FEF9E7| Sistem |
+|#F9EBEA| Database |
+|#EAFAF1| Service |
+
+start
+
+|Admin|
+:Akses Menu Transaksi;
+
+|Sistem|
+:Verifikasi token & role\n(admin/manager);
+
+if (Terautentikasi?) then (tidak)
+  :Return error 401;
+  stop
+else (ya)
+  |Database|
+  :Load daftar transaksi\n(dengan relasi produk & user);
+  
+  |Sistem|
+  :Tampilkan daftar transaksi\n(paginated, terurut terbaru);
+
+  |Admin|
+  :Pilih aksi;
+
+  fork
+    ' ── Tambah Transaksi Manual ────────────────────────────────────
+    -> Tambah Transaksi;
+    
+    |Sistem|
+    :Cek role (hanya Admin);
+    
+    if (Admin?) then (tidak)
+      :Return 403 Forbidden;
+    else (ya)
+      |Admin|
+      :Isi form transaksi\n(produk, tanggal, qty,\nharga satuan, ref order);
+      
+      |Sistem|
+      :Validasi input\n(product_id exists,\nquantity >= 1, price >= 0);
+      
+      if (Valid?) then (tidak)
+        :Tampilkan error validasi;
+        |Admin|
+        :Perbaiki input;
+      else (ya)
+        |Sistem|
+        :Hitung total_amount\n= qty * unit_price;
+        :Set source = "manual";
+        :Set user_id dari token;
+        
+        |Database|
+        :INSERT transactions;
+        
+        |Service|
+        :Update product stock\n(decrement current_stock);
+        :Refresh product data;
+        :NotificationService\n::checkLowStock(product);
+        
+        if (Stok <= threshold?) then (ya)
+          |Database|
+          :INSERT notifications\n(type: low_stock);
+        else (tidak)
+          :Tidak ada notifikasi;
+        endif
+        
+        |Sistem|
+        :Return transaksi baru\n(status 201, load product);
+        
+        |Admin|
+        :Lihat notifikasi sukses;
+        :List transaksi diperbarui;
+      endif
+    endif
+
+  fork again
+    ' ── Lihat Ringkasan / Summary ──────────────────────────────────
+    -> Lihat Ringkasan;
+    
+    |Admin|
+    :Pilih periode & group by\n(day/week/month);
+    
+    |Database|
+    :GROUP BY periode\nSUM(total_amount, quantity)\nCOUNT(*) transaksi;
+    
+    |Sistem|
+    :Tampilkan grafik ringkasan;
+
+  fork again
+    ' ── Filter Transaksi ───────────────────────────────────────────
+    -> Filter Transaksi;
+    
+    |Admin|
+    :Set filter\n(start_date, end_date,\nproduct_id, source);
+    
+    |Database|
+    :Query dengan kondisi filter;
+    
+    |Sistem|
+    :Tampilkan hasil filter;
+
+  end fork
+
+  |Admin|
+  :Selesai;
+endif
+
+stop
+
+@enduml

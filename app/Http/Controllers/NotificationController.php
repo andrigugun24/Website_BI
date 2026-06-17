@@ -10,10 +10,23 @@ class NotificationController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $notifications = Notification::orderBy('created_at', 'desc')->get();
-        $unreadCount = Notification::where('is_read', false)->count();
+        $userId = $request->user()->id;
+
+        $notifications = Notification::where(function ($q) use ($userId) {
+                $q->where('user_id', $userId)
+                  ->orWhereNull('user_id');
+            })
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        $unreadCount = Notification::where(function ($q) use ($userId) {
+                $q->where('user_id', $userId)
+                  ->orWhereNull('user_id');
+            })
+            ->where('is_read', false)
+            ->count();
 
         return response()->json([
             'notifications' => $notifications,

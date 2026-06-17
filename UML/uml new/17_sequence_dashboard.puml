@@ -1,0 +1,83 @@
+@startuml Sequence_Dashboard
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam sequence {
+  ParticipantBackgroundColor #EBF5FB
+  ParticipantBorderColor #2980B9
+  ArrowColor #2C3E50
+  LifeLineBorderColor #BDC3C7
+  LifeLineBackgroundColor #ECF0F1
+  ActorBackgroundColor #FDEBD0
+  ActorBorderColor #E67E22
+}
+skinparam NoteBackgroundColor #FFFDE7
+skinparam NoteBorderColor #F9A825
+
+title Sequence Diagram — Dashboard & Notifikasi
+
+actor "Pengguna" as User
+participant "React Frontend" as FE
+participant "Sanctum Middleware" as Auth
+participant "DashboardController" as DC
+participant "NotificationController" as NC
+database "Database" as DB
+
+autonumber
+
+== Load Dashboard ==
+
+User -> FE : Akses halaman Dashboard\n(setelah login berhasil)
+
+FE -> Auth : GET /api/me\nAuthorization: Bearer {token}
+Auth -> DB : SELECT user WITH role
+DB --> Auth : User + Role info
+Auth --> FE : 200 { user }
+FE -> FE : Simpan user context\n(role, nama)
+
+FE -> Auth : GET /api/dashboard
+Auth -> Auth : Validasi token (semua role)
+Auth -> DC : index(request)
+
+DC -> DB : Query 1:\nSELECT COUNT(*) products WHERE is_active=1
+DC -> DB : Query 2:\nSELECT COUNT(*) transactions (hari ini)
+DC -> DB : Query 3:\nSELECT SUM(total_amount) transaksi (hari ini)
+DC -> DB : Query 4:\nSELECT COUNT(*) low_stock products
+DC -> DB : Query 5:\nSELECT COUNT(*) underperforming\n(latest per product)
+DC -> DB : Query 6:\nRevenue 7 hari terakhir
+
+DB --> DC : Semua agregasi
+
+DC --> FE : 200 {\n  total_products,\n  today_transactions,\n  today_revenue,\n  low_stock_count,\n  underperforming_count,\n  recent_revenue: [...]\n}
+
+FE -> FE : Render kartu statistik\n& grafik mini
+
+== Load Notifikasi ==
+
+FE -> Auth : GET /api/notifications
+Auth -> NC : index(request)
+NC -> DB : SELECT * FROM notifications\nORDER BY created_at DESC\nLIMIT 10
+DB --> NC : Notifications
+NC --> FE : 200 [ { id, type, message,\n  is_read, created_at }, ... ]
+
+FE -> FE : Tampilkan badge\njumlah notifikasi belum dibaca
+FE --> User : Dashboard siap dengan\nnotifikasi
+
+== Tandai Notifikasi Dibaca ==
+
+User -> FE : Klik notifikasi
+FE -> Auth : POST /api/notifications/{id}/read
+Auth -> NC : markAsRead(notification)
+NC -> DB : UPDATE notifications\nSET is_read = true\nWHERE id = ?
+DB --> NC : Updated
+NC --> FE : 200 { message: "Berhasil" }
+FE -> FE : Update badge count\nHilangkan highlight notifikasi
+
+User -> FE : Klik "Tandai Semua Dibaca"
+FE -> Auth : POST /api/notifications/read-all
+Auth -> NC : markAllAsRead(request)
+NC -> DB : UPDATE notifications\nSET is_read = true
+DB --> NC : Updated all
+NC --> FE : 200 { message: "Semua dibaca" }
+FE --> User : Badge = 0\nSemua notifikasi hilang highlight
+
+@enduml

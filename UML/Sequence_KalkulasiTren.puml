@@ -1,0 +1,32 @@
+@startuml
+skinparam maxMessageSize 150
+skinparam ParticipantPadding 20
+
+actor Admin
+boundary "Menu Dasbor ETL\n(View)" as View
+control "AnalyticsController\n(Controller)" as Controller
+entity "Transaction\n(Model)" as Trans
+entity "TrendAnalysis\n(Model)" as Trend
+database "MySQL\n(Database)" as DB
+
+Admin -> View ++ : Mengklik Tombol "Jalankan Analisis Tren"
+View -> Controller ++ : POST API requestAnalysis()
+
+Controller -> Trans ++ : Meminta Data Periode T1 & T0
+Trans -> DB ++ : Query: SUM(amount) GROUP BY product_id
+DB --> Trans -- : Kumpulan Raw Data Transaksi
+Trans --> Controller -- : Mengembalikan Array Data Penjualan
+
+Controller -> Controller : Hitung Rasio = (T1 / T0) * 100
+Controller -> Controller : Evalusi Logika 'Underperforming'
+
+Controller -> Trend ++ : Simpan Hasil (updateOrCreate)
+Trend -> DB ++ : Query: INSERT / UPDATE ke tabel trend_analyses
+DB --> Trend -- : Status Success DB
+Trend --> Controller -- : Return Data Analisis yang Fix
+
+Controller --> View : Kirim Respon Status = Sukses 200 OK
+View --> Admin -- : Render Ulang Chart & Indikator Bias
+
+deactivate Controller
+@enduml

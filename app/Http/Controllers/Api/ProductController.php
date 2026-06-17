@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Product;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use App\Imports\ProductImport;
+use Maatwebsite\Excel\Facades\Excel;
 
 class ProductController extends Controller
 {
@@ -145,5 +147,38 @@ class ProductController extends Controller
             ->pluck('category');
 
         return response()->json($categories);
+    }
+
+    /**
+     * Import products from Excel/CSV.
+     */
+    public function import(Request $request): JsonResponse
+    {
+        $request->validate([
+            'file' => 'required|file|mimes:xlsx,xls,csv,txt|max:10240',
+        ]);
+
+        Excel::import(new ProductImport, $request->file('file'));
+
+        return response()->json([
+            'message' => 'Data produk berhasil diimpor.'
+        ]);
+    }
+
+    /**
+     * Download CSV template for import.
+     */
+    public function downloadTemplate()
+    {
+        $headers = [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => 'attachment; filename="template_produk.csv"',
+        ];
+
+        $content = "sku,name,category,price,current_stock,min_stock_threshold\n";
+        $content .= "PROD-001,Contoh Produk,Pakaian,150000,50,10\n";
+        $content .= "PROD-002,Contoh Produk 2,Aksesoris,50000,100,20\n";
+
+        return response($content, 200, $headers);
     }
 }

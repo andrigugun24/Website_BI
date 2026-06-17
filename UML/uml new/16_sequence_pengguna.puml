@@ -1,0 +1,129 @@
+@startuml Sequence_Manajemen_Pengguna
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam sequence {
+  ParticipantBackgroundColor #EBF5FB
+  ParticipantBorderColor #2980B9
+  ArrowColor #2C3E50
+  LifeLineBorderColor #BDC3C7
+  LifeLineBackgroundColor #ECF0F1
+  ActorBackgroundColor #FDEBD0
+  ActorBorderColor #E67E22
+}
+skinparam NoteBackgroundColor #FFFDE7
+skinparam NoteBorderColor #F9A825
+
+title Sequence Diagram — Manajemen Pengguna
+
+actor "Admin" as Admin
+participant "React Frontend" as FE
+participant "Sanctum Middleware" as Auth
+participant "UserController" as UC
+participant "NotificationService" as NS
+database "Database" as DB
+
+autonumber
+
+== Lihat Daftar Pengguna ==
+
+Admin -> FE : Akses halaman Pengguna
+FE -> Auth : GET /api/users\nAuthorization: Bearer {token}
+Auth -> Auth : Cek role: admin only
+
+alt Bukan Admin
+  Auth --> FE : 403 Forbidden
+end
+
+Auth -> UC : index(request)
+UC -> DB : SELECT users WITH role\nORDER BY name
+DB --> UC : User list
+UC --> FE : 200 [ { id, name, email,\n  is_active, role: {...} }, ... ]
+FE --> Admin : Tampilkan tabel pengguna
+
+FE -> Auth : GET /api/roles
+Auth -> UC : roles()
+UC -> DB : SELECT * FROM roles\nORDER BY name
+DB --> UC : Roles list
+UC --> FE : 200 [ { id, name, slug, permissions } ]
+FE --> Admin : Isi dropdown role
+
+== Tambah Pengguna ==
+
+Admin -> FE : Klik "Tambah Pengguna"\nIsi form: nama, email,\npassword, role, status aktif
+FE -> Auth : POST /api/users\n{ name, email, password,\n  role_id, is_active }
+
+Auth -> UC : store(request)
+UC -> UC : Validasi:\n- email unique di users\n- password min 8 karakter\n- role_id exists di roles
+
+alt Validasi gagal
+  UC --> FE : 422 { errors }
+  FE --> Admin : Tampilkan error
+end
+
+UC -> UC : Hash::make(password)
+UC -> DB : INSERT INTO users\n{ name, email, hashed_password,\n  role_id, is_active: true }
+DB --> UC : User baru
+
+UC -> DB : SELECT roles WHERE id = role_id
+DB --> UC : Role name
+
+UC -> NS : notifyNewUser(user.name, role.name)
+NS -> DB : INSERT INTO notifications\n{ type: "new_user",\n  message: "Pengguna baru {nama}\n  telah ditambahkan sebagai {role}" }
+DB --> NS : Notification
+
+UC --> FE : 201 { message,\n  user: { ...with role } }
+FE --> Admin : Notifikasi sukses\nRefresh daftar
+
+== Edit Pengguna ==
+
+Admin -> FE : Klik "Edit" pada pengguna
+Admin -> FE : Ubah data yang diperlukan
+FE -> Auth : PUT /api/users/{id}\n{ field yang diubah... }
+Auth -> UC : update(request, user)
+
+UC -> UC : Validasi:\n- email unique kecuali user ini sendiri\n- password nullable (jika diisi, min 8)
+
+alt Validasi gagal
+  UC --> FE : 422 { errors }
+end
+
+alt Password diubah
+  UC -> UC : Hash::make(password baru)
+end
+
+UC -> DB : UPDATE users WHERE id = ?\nSET { field yang berubah }
+DB --> UC : Updated user
+UC --> FE : 200 { message, user: { ...with role } }
+FE --> Admin : Refresh data\nNotifikasi sukses
+
+== Hapus / Nonaktifkan Pengguna ==
+
+Admin -> FE : Klik "Hapus" pada pengguna
+FE -> FE : Tampilkan konfirmasi dialog
+Admin -> FE : Konfirmasi hapus
+FE -> Auth : DELETE /api/users/{id}
+Auth -> UC : destroy(user)
+
+UC -> UC : Cek:\nauth.user.id == user.id?
+
+alt Menghapus diri sendiri
+  UC --> FE : 403 { message: "Tidak dapat\n  hapus akun sendiri" }
+  FE --> Admin : Tampilkan error
+end
+
+UC -> DB : SELECT COUNT(*) FROM transactions\nWHERE user_id = user.id
+DB --> UC : Transaction count
+
+alt Ada riwayat transaksi
+  UC -> DB : UPDATE users SET is_active = false\nWHERE id = user.id
+  DB --> UC : Updated
+  UC --> FE : 200 { message: "Dinonaktifkan\n  karena ada riwayat transaksi" }
+else Tidak ada transaksi
+  UC -> DB : DELETE FROM users WHERE id = user.id
+  DB --> UC : Deleted
+  UC --> FE : 200 { message: "Berhasil dihapus" }
+end
+
+FE --> Admin : Refresh daftar\nNotifikasi sukses
+
+@enduml

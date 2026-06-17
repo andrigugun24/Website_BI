@@ -17,7 +17,7 @@ class DatabaseSeeder extends Seeder
         $this->call([
             RoleSeeder::class,
             UserSeeder::class,
-            ProductSeeder::class,
+            // ProductSeeder::class, // Komentar baris ini agar data dummy tidak terisi
         ]);
     }
 }

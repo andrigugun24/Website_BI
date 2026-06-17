@@ -1,0 +1,101 @@
+@startuml Activity_Login
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam activity {
+  BackgroundColor #EBF5FB
+  BorderColor #2980B9
+  ArrowColor #2C3E50
+  DiamondBackgroundColor #FDEBD0
+  DiamondBorderColor #E67E22
+}
+skinparam StartColor #27AE60
+skinparam EndColor #E74C3C
+
+title Activity Diagram — Autentikasi (Login & Logout)
+
+|#EBF5FB| Pengguna |
+|#FEF9E7| Sistem |
+|#F9EBEA| Database |
+
+start
+
+|Pengguna|
+:Akses Halaman Login;
+:Masukkan Email & Password;
+:Klik Tombol Login;
+
+|Sistem|
+:Validasi format input;
+
+if (Format valid?) then (tidak)
+  :Tampilkan pesan\nerror validasi;
+  |Pengguna|
+  :Perbaiki Input;
+  stop
+else (ya)
+  |Database|
+  :Cari user berdasarkan email;
+  
+  if (User ditemukan?) then (tidak)
+    |Sistem|
+    :Return error:\n"Kredensial salah";
+    |Pengguna|
+    :Lihat pesan error;
+    stop
+  else (ya)
+    |Database|
+    :Verifikasi password (bcrypt);
+    
+    if (Password cocok?) then (tidak)
+      |Sistem|
+      :Return error:\n"Kredensial salah";
+      |Pengguna|
+      :Lihat pesan error;
+      stop
+    else (ya)
+      |Database|
+      :Cek status is_active user;
+      
+      if (Akun aktif?) then (tidak)
+        |Sistem|
+        :Return error 403:\n"Akun tidak aktif";
+        |Pengguna|
+        :Lihat pesan error;
+        stop
+      else (ya)
+        |Database|
+        :Hapus semua token lama;
+        :Buat token Sanctum baru\n(dengan abilities role);
+        :Simpan ActivityLog\n(action: login);
+        
+        |Sistem|
+        :Return response:\nuser info + token;
+        
+        |Pengguna|
+        :Simpan token di localStorage;
+        :Redirect ke Dashboard;
+        
+        ' Alur Logout
+        :Klik Tombol Logout;
+        
+        |Sistem|
+        :Validasi token;
+        
+        |Database|
+        :Hapus current access token;
+        :Simpan ActivityLog\n(action: logout);
+        
+        |Sistem|
+        :Return "Berhasil logout";
+        
+        |Pengguna|
+        :Hapus token dari localStorage;
+        :Redirect ke halaman Login;
+      endif
+    endif
+  endif
+endif
+
+stop
+
+@enduml
